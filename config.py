@@ -24,8 +24,17 @@ class Config:
     FACE_API_URL = "http://hpcinf01.aitc.bjwdt.qihoo.net:6980/api/v1/image/sync"
 
     # --- 模型路径配置 ---
-    WHISPER_MODEL_PATH = "./faster-whisper-medium"
     YOLO_MODEL_PATH = "./yolov8n.pt"
+
+    # --- ASR (语音转写) API 配置 ---
+    ASR_API_URL = os.getenv("ASR_API_URL")
+    ASR_API_KEY = os.getenv("ASR_API_KEY")
+    # ASR 并发线程数
+    ASR_THREAD_POOL_SIZE = 6
+
+    # --- OCR API 配置 ---
+    OCR_API_URL = os.getenv("OCR_API_URL")
+    OCR_API_KEY = os.getenv("OCR_API_KEY")
 
     # --- 业务目录配置 ---
     # 使用 Path 对象自动处理不同操作系统的路径分隔符
