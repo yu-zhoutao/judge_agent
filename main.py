@@ -1,4 +1,8 @@
 import os
+import sys
+
+sys.path.append('D:\pycharm_project')
+
 import time
 import asyncio
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
