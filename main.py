@@ -1,7 +1,6 @@
 import os
 import sys
 
-sys.path.append('D:\pycharm_project')
 
 import time
 import asyncio
