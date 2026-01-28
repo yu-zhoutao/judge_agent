@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>内容安全卫士 AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            background: '#f8fafc', primary: '#3b82f6', accent: '#8b5cf6',
+            success: '#10b981', danger: '#ef4444', warning: '#f59e0b'
+          },
+          animation: { 'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite' }
+        },
+      },
+    }
+  </script>
+  <style>
+    body { background-color: #f8fafc; font-family: 'Inter', sans-serif; overflow: hidden; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.8); box-shadow: 0 8px 30px rgba(0,0,0,0.04);
+      border-radius: 0.75rem;
+    }
+    .toggle-switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .4s; border-radius: 34px; }
+    .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #3b82f6; }
+    input:checked + .slider:before { transform: translateX(20px); }
+    .tab-active { background-color: white; color: #1e293b; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .tab-inactive { color: #94a3b8; }
+    .status-indicator { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .status-idle { background-color: #cbd5e1; }
+    .status-processing { background-color: #fbbf24; animation: pulse 2s infinite; }
+    .status-complete { background-color: #10b981; }
+    .status-error { background-color: #ef4444; }
+    .progress-bar { height: 8px; background-color: #f1f5f9; border-radius: 9999px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(to right, #60a5fa, #818cf8); transition: width 0.3s ease; }
+    
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 { margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 700; color: #1e293b; }
+    .markdown-body h3 { font-size: 1.1rem; border-left: 4px solid #3b82f6; padding-left: 0.5em; }
+    .markdown-body p { margin-bottom: 1em; line-height: 1.6; color: #475569; }
+    .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; color: #475569; }
+    .markdown-body li { margin-bottom: 0.3em; }
+    .markdown-body strong { color: #0f172a; font-weight: 600; }
+    
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+  </style>
+</head>
+<body class="h-screen w-full flex p-4 gap-4">
+  
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0 w-full">
+    
+    <div class="lg:col-span-7 flex flex-col gap-4 h-full min-h-0">
+      
+      <div class="flex items-center justify-between shrink-0 px-1">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <i class="fas fa-shield-alt text-white text-lg"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-slate-800 tracking-tight leading-none text-lg">Content Guardian</h1>
+            <p class="text-xs text-slate-500 font-mono mt-0.5">内容安全 AI</p>
+          </div>
+        </div>
+
+        <div class="flex gap-1 p-1 bg-white/50 backdrop-blur rounded-lg w-fit border border-white/60">
+          <button onclick="switchLeftTab('preview')" class="px-4 py-1.5 rounded-md text-sm font-medium transition-all tab-button-preview tab-active">媒体预览</button>
+          <button onclick="switchLeftTab('report')" class="px-4 py-1.5 rounded-md text-sm font-medium transition-all tab-button-report tab-inactive">合规报告</button>
+        </div>
+      </div>
+      <div class="flex-1 min-h-0 relative rounded-xl overflow-hidden">
+        <div id="preview-panel" class="h-full w-full">
+          <div id="media-upload-area" class="h-full rounded-xl border-2 border-dashed border-slate-300 bg-white/40 hover:border-blue-400 hover:bg-blue-50/30 transition-all flex flex-col items-center justify-center gap-4 cursor-pointer relative">
+            <div class="w-20 h-20 rounded-2xl bg-white shadow-md text-blue-400 flex items-center justify-center mb-2"><i class="fas fa-cloud-upload-alt text-3xl"></i></div>
+            <div class="text-center space-y-1">
+              <h3 class="text-lg font-bold text-slate-700">点击或拖拽上传文件</h3>
+              <p class="text-xs text-slate-400">支持 MP4, JPG, PNG, MP3</p>
+            </div>
+            <input type="file" id="file-input" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,video/*,audio/*">
+          </div>
+          
+          <div id="media-preview-container" class="hidden glass-card h-full flex flex-col relative bg-slate-50 overflow-hidden">
+            <button id="clear-media-btn" class="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/80 text-slate-600 hover:text-red-500 shadow-md backdrop-blur"><i class="fas fa-times"></i></button>
+            
+            <div class="flex-1 flex items-center justify-center bg-slate-100 relative overflow-hidden p-4">
+              <div id="media-content-placeholder" class="text-center z-10"><i class="fas fa-film text-4xl text-slate-300 mb-4 block"></i><span class="text-slate-400 text-sm">媒体预览区</span></div>
+              <video id="video-preview" class="max-h-full max-w-full object-contain z-10 hidden shadow-lg rounded-lg" controls></video>
+              <img id="image-preview" class="max-h-full max-w-full object-contain z-10 hidden shadow-lg rounded-lg" />
+              <audio id="audio-preview" class="hidden z-10 w-3/4 shadow-lg rounded-full" controls></audio>
+            </div>
+
+            <div class="h-14 border-t border-white/60 bg-white/60 backdrop-blur flex items-center px-6 justify-between z-10 shrink-0">
+              <div class="flex items-center gap-4">
+                <div class="p-2 bg-blue-50 rounded-lg text-blue-500"><i class="fas fa-file-video" id="media-type-icon"></i></div>
+                <div><span class="text-sm font-semibold text-slate-700 block truncate max-w-[200px]" id="media-name">Filename</span><span class="text-xs text-slate-400 font-mono" id="media-size">0 MB</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div id="report-panel" class="hidden glass-card h-full p-6 bg-white/80 flex flex-col absolute inset-0">
+          <div class="flex items-center justify-between mb-4 shrink-0">
+            <h3 class="text-slate-800 font-bold flex items-center gap-2"><div class="p-1.5 bg-blue-100 text-blue-600 rounded-md"><i class="fas fa-file-contract"></i></div>最终合规报告</h3>
+            <button id="copy-btn" onclick="copyReport()" class="text-xs text-slate-400 hover:text-blue-500 flex items-center gap-1 transition-colors"><i class="fas fa-copy"></i><span>复制</span></button>
+          </div>
+          <div class="flex-1 overflow-y-auto custom-scroll pr-2" id="report-content">
+            <div class="h-full flex flex-col items-center justify-center text-slate-400">
+              <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4"><i class="fas fa-file-alt text-2xl opacity-50"></i></div>
+              <p class="font-medium text-sm">等待分析结果...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card p-4 flex items-center justify-between shrink-0 bg-white/90">
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Status</span>
+          <div class="flex items-center gap-2">
+            <span class="status-indicator status-idle" id="status-indicator"></span>
+            <span class="text-sm font-bold text-slate-700" id="status-text">待机 (Idle)</span>
+            <span id="timer-display" class="ml-2 text-xs font-mono text-blue-500 bg-blue-50 px-2 py-0.5 rounded hidden">0.0s</span>
+          </div>
+        </div>
+        <div class="flex-1 mx-8 hidden" id="progress-container">
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
+        </div>
+        <button id="analyze-btn" disabled class="flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-sm border bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed">
+          <i class="fas fa-sparkles"></i> <span>开始分析</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-4 h-full min-h-0">
+      <div class="flex gap-4 px-2 h-[36px] items-center shrink-0 border-b border-slate-200/50 overflow-x-auto no-scrollbar">
+        <button onclick="switchRightTab('logs')" class="text-sm font-bold transition-colors flex items-center gap-2 tab-right-logs text-slate-800 border-b-2 border-blue-500 pb-1 shrink-0">
+          <i class="fas fa-terminal text-xs"></i> 日志
+        </button>
+        <button onclick="switchRightTab('transcript')" class="text-sm font-bold transition-colors flex items-center gap-2 tab-right-transcript text-slate-400 hover:text-slate-600 pb-1 shrink-0">
+          <i class="fas fa-quote-right text-xs"></i> 音频文本
+        </button>
+        <button onclick="switchRightTab('keyframes')" class="text-sm font-bold transition-colors flex items-center gap-2 tab-right-keyframes text-slate-400 hover:text-slate-600 pb-1 shrink-0">
+          <i class="fas fa-images text-xs"></i> 关键帧
+        </button>
+        <button onclick="switchRightTab('violations')" class="text-sm font-bold transition-colors flex items-center gap-2 tab-right-violations text-slate-400 hover:text-rose-500 pb-1 shrink-0">
+          <i class="fas fa-scissors text-xs"></i> 违规证据
+        </button>
+      </div>
+
+      <div class="flex-1 min-h-0 relative">
+        <div id="logs-panel" class="glass-card h-full flex flex-col bg-white border-white/60 shadow-sm font-mono text-sm absolute inset-0">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
+            <div class="flex items-center gap-2 text-slate-500"><i class="fas fa-terminal"></i><span class="text-xs uppercase tracking-wider font-semibold">执行日志</span></div>
+          </div>
+          <div class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3 bg-white" id="logs-container">
+            <div class="text-slate-400 text-center py-8"><i class="fas fa-info-circle mr-2"></i>任务准备就绪</div>
+          </div>
+        </div>
+
+        <div id="transcript-panel" class="hidden glass-card h-full flex flex-col bg-white border-white/60 shadow-sm absolute inset-0">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div class="flex items-center gap-2 text-slate-500"><i class="fas fa-file-audio"></i><span class="text-xs uppercase tracking-wider font-semibold">识别结果 (已纠错)</span></div>
+              <button onclick="copyTranscript()" class="text-xs text-blue-500 hover:text-blue-700 transition-colors flex items-center gap-1"><i class="fas fa-copy"></i> 复制</button>
+          </div>
+          <div class="flex-1 p-4 overflow-y-auto custom-scroll">
+              <p id="transcript-content" class="text-slate-600 leading-relaxed text-sm whitespace-pre-wrap">等待音频转写...</p>
+          </div>
+        </div>
+        
+        <div id="keyframes-panel" class="hidden glass-card h-full p-4 overflow-y-auto custom-scroll bg-white/60 absolute inset-0">
+          <div class="grid grid-cols-2 gap-3" id="keyframes-grid">
+            <div class="col-span-2 text-center py-20 text-slate-400"><p class="text-sm">暂无关键帧</p></div>
+          </div>
+        </div>
+
+        <div id="violations-panel" class="hidden glass-card h-full p-4 overflow-y-auto custom-scroll bg-white/60 absolute inset-0">
+          <div class="space-y-4" id="violations-container">
+            <div class="text-center py-20 text-slate-400"><p class="text-sm">暂无违规切片</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card p-4 bg-blue-50/50 border-blue-100 shrink-0">
+        <div class="flex items-start gap-3">
+          <div class="p-2 bg-blue-100 rounded-lg text-blue-600"><i class="fas fa-robot"></i></div>
+          <div>
+            <h4 class="text-xs font-bold text-blue-700 mb-1 uppercase">Model Context</h4>
+            <p class="text-xs text-slate-500">Multimodal Agent • Redline-Review: ON</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      media: null,
+      logs: [],
+      keyframes: [],
+      reportRawText: '',
+      abortController: null,
+      timerInterval: null,
+      startTime: 0
+    };
+
+    const el = {
+      fileInput: document.getElementById('file-input'),
+      uploadArea: document.getElementById('media-upload-area'),
+      previewContainer: document.getElementById('media-preview-container'),
+      videoPreview: document.getElementById('video-preview'),
+      imagePreview: document.getElementById('image-preview'),
+      audioPreview: document.getElementById('audio-preview'),
+      mediaPlaceholder: document.getElementById('media-content-placeholder'),
+      mediaName: document.getElementById('media-name'),
+      mediaSize: document.getElementById('media-size'),
+      mediaIcon: document.getElementById('media-type-icon'),
+      analyzeBtn: document.getElementById('analyze-btn'),
+      clearBtn: document.getElementById('clear-media-btn'),
+      statusIndicator: document.getElementById('status-indicator'),
+      statusText: document.getElementById('status-text'),
+      progressContainer: document.getElementById('progress-container'),
+      progressFill: document.getElementById('progress-fill'),
+      logsContainer: document.getElementById('logs-container'),
+      reportContent: document.getElementById('report-content'),
+      keyframesGrid: document.getElementById('keyframes-grid'),
+      violationsContainer: document.getElementById('violations-container'),
+      previewPanel: document.getElementById('preview-panel'),
+      reportPanel: document.getElementById('report-panel'),
+      logsPanel: document.getElementById('logs-panel'),
+      transcriptPanel: document.getElementById('transcript-panel'),
+      transcriptContent: document.getElementById('transcript-content'),
+      keyframesPanel: document.getElementById('keyframes-panel'),
+      violationsPanel: document.getElementById('violations-panel'),
+      copyBtn: document.getElementById('copy-btn'),
+      timerDisplay: document.getElementById('timer-display')
+    };
+
+    el.fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+    el.clearBtn.addEventListener('click', clearMedia);
+    el.analyzeBtn.addEventListener('click', startAnalysis);
+    
+    el.uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); el.uploadArea.classList.add('border-blue-400', 'bg-blue-50/50'); });
+    el.uploadArea.addEventListener('dragleave', () => { el.uploadArea.classList.remove('border-blue-400', 'bg-blue-50/50'); });
+    el.uploadArea.addEventListener('drop', (e) => { e.preventDefault(); el.uploadArea.classList.remove('border-blue-400', 'bg-blue-50/50'); handleFile(e.dataTransfer.files[0]); });
+
+    window.switchLeftTab = (tab) => {
+      document.querySelector('.tab-button-preview').className = `px-4 py-1.5 rounded-md text-sm font-medium transition-all tab-button-preview ${tab === 'preview' ? 'tab-active' : 'tab-inactive'}`;
+      document.querySelector('.tab-button-report').className = `px-4 py-1.5 rounded-md text-sm font-medium transition-all tab-button-report ${tab === 'report' ? 'tab-active' : 'tab-inactive'}`;
+      el.previewPanel.classList.toggle('hidden', tab !== 'preview');
+      el.reportPanel.classList.toggle('hidden', tab !== 'report');
+    };
+
+    window.switchRightTab = (tab) => {
+      const tabs = ['logs', 'transcript', 'keyframes', 'violations'];
+      tabs.forEach(t => {
+        const btn = document.querySelector(`.tab-right-${t}`);
+        const panel = el[`${t}Panel`];
+        const isActive = t === tab;
+        if (isActive) {
+          btn.className = `text-sm font-bold transition-colors flex items-center gap-2 pb-1 shrink-0 tab-right-${t} ${t === 'violations' ? 'text-rose-600 border-b-2 border-rose-500' : 'text-slate-800 border-b-2 border-blue-500'}`;
+          panel.classList.remove('hidden');
+        } else {
+          btn.className = `text-sm font-bold transition-colors flex items-center gap-2 pb-1 shrink-0 tab-right-${t} text-slate-400 hover:text-slate-600`;
+          panel.classList.add('hidden');
+        }
+      });
+    };
+
+    window.copyReport = () => {
+      if (!state.reportRawText) return;
+      navigator.clipboard.writeText(state.reportRawText).then(() => {
+        const originalHtml = el.copyBtn.innerHTML;
+        el.copyBtn.innerHTML = '<i class="fas fa-check text-emerald-500"></i><span class="text-emerald-500">已复制</span>';
+        setTimeout(() => { el.copyBtn.innerHTML = originalHtml; }, 2000);
+      });
+    };
+
+    window.copyTranscript = () => {
+       const text = el.transcriptContent.innerText;
+       if(!text || text === '等待音频转写...') return;
+       navigator.clipboard.writeText(text).then(() => { addLog('音频文本已复制', 'success'); });
+    };
+
+    function handleFile(file) {
+      if (!file) return;
+      let type = 'unknown';
+      if (file.type.startsWith('image') || file.name.match(/\.(jpg|jpeg|png|webp)$/i)) type = 'image';
+      else if (file.type.startsWith('video') || file.name.match(/\.(mp4|mov|avi)$/i)) type = 'video';
+      else if (file.type.startsWith('audio') || file.name.match(/\.(mp3|wav|m4a)$/i)) type = 'audio';
+
+      state.media = { file, type };
+      el.mediaName.textContent = file.name;
+      el.mediaSize.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+      el.mediaIcon.className = type === 'video' ? 'fas fa-file-video' : type === 'image' ? 'fas fa-file-image' : 'fas fa-file-audio';
+
+      el.uploadArea.classList.add('hidden');
+      el.previewContainer.classList.remove('hidden');
+      el.videoPreview.classList.add('hidden');
+      el.imagePreview.classList.add('hidden');
+      el.audioPreview.classList.add('hidden');
+      el.mediaPlaceholder.classList.add('hidden');
+
+      if (state.media.url) URL.revokeObjectURL(state.media.url);
+      const url = URL.createObjectURL(file);
+      state.media.url = url;
+
+      if (type === 'video') {
+        el.videoPreview.src = url;
+        el.videoPreview.classList.remove('hidden');
+        el.videoPreview.load(); 
+      } else if (type === 'image') {
+        el.imagePreview.src = url;
+        el.imagePreview.classList.remove('hidden');
+      } else {
+        el.audioPreview.src = url;
+        el.audioPreview.classList.remove('hidden');
+        el.mediaPlaceholder.classList.remove('hidden');
+      }
+
+      el.analyzeBtn.disabled = false;
+      el.analyzeBtn.className = "flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-sm border bg-slate-900 text-white border-slate-900 hover:bg-slate-800 hover:scale-[1.02]";
+    }
+
+    function clearMedia() {
+      state.media = null;
+      el.fileInput.value = '';
+      el.uploadArea.classList.remove('hidden');
+      el.previewContainer.classList.add('hidden');
+      el.videoPreview.src = '';
+      el.imagePreview.src = '';
+      el.audioPreview.src = '';
+      el.analyzeBtn.disabled = true;
+      el.analyzeBtn.className = "flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-sm border bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed";
+    }
+
+    function addLog(msg, type = 'info') {
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+      const colors = { info: 'text-slate-600', ai: 'text-violet-700', success: 'text-emerald-700', error: 'text-rose-700', warning: 'text-amber-700' };
+      const icons = { info: 'fa-info-circle text-blue-500', ai: 'fa-brain text-violet-500', success: 'fa-check-circle text-emerald-500', error: 'fa-times-circle text-rose-500', warning: 'fa-exclamation-triangle text-amber-500' };
+      const div = document.createElement('div');
+      div.className = "flex gap-3 text-sm";
+      div.innerHTML = `<span class="text-slate-400 font-mono text-xs pt-1 shrink-0">${time}</span><div class="flex gap-2 items-start"><span class="mt-0.5"><i class="fas ${icons[type]}"></i></span><p class="${colors[type]} leading-relaxed">${msg}</p></div>`;
+      el.logsContainer.appendChild(div);
+      el.logsContainer.scrollTop = el.logsContainer.scrollHeight;
+    }
+
+    async function startAnalysis() {
+      if (!state.media) return;
+      if (state.abortController) state.abortController.abort();
+      state.abortController = new AbortController();
+
+      el.logsContainer.innerHTML = '';
+      el.reportContent.innerHTML = '';
+      el.keyframesGrid.innerHTML = '<div class="col-span-2 text-center py-20 text-slate-400"><p class="text-sm">提取关键帧中...</p></div>';
+      el.violationsContainer.innerHTML = '<div class="text-center py-20 text-slate-400"><p class="text-sm">等待违规检测...</p></div>';
+      el.transcriptContent.textContent = '等待音频转写...'; 
+      state.reportRawText = ''; 
+      el.progressContainer.classList.remove('hidden');
+      el.progressFill.style.width = '5%';
+      
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state.startTime = Date.now();
+      el.timerDisplay.classList.remove('hidden');
+      el.timerDisplay.classList.replace('text-emerald-500', 'text-blue-500');
+      el.timerDisplay.classList.replace('bg-emerald-50', 'bg-blue-50');
+      el.timerDisplay.textContent = '0.0s';
+      
+      state.timerInterval = setInterval(() => {
+        el.timerDisplay.textContent = ((Date.now() - state.startTime) / 1000).toFixed(1) + 's';
+      }, 100);
+      
+      updateStatus('processing');
+      switchLeftTab('report');
+      switchRightTab('logs');
+      addLog(`开始分析文件: ${state.media.file.name}`, 'info');
+
+      try {
+        const formData = new FormData();
+        formData.append('file', state.media.file);
+        formData.append('enable_search', true); // Default to true as the checkbox is removed
+
+        addLog('正在上传并启动流式分析引擎...', 'info');
+        const res = await fetch('/analyze', {
+          method: 'POST', body: formData, signal: state.abortController.signal
+        });
+
+        if (!res.ok) throw new Error(res.statusText);
+        
+        el.progressFill.style.width = '20%';
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let reportText = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() || '';
+
+          for (const part of parts) {
+            if (part.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(part.slice(6));
+                switch (data.type) {
+                  case 'log': addLog(data.content, 'info'); break;
+                  case 'images':
+                    el.keyframesGrid.innerHTML = data.content.map((b64, i) => `
+                      <div class="aspect-video rounded-lg overflow-hidden border border-slate-200 shadow-sm relative group bg-black">
+                        <img src="${b64}" class="w-full h-full object-contain" />
+                        <div class="absolute top-1 right-1 bg-black/60 px-1.5 py-0.5 rounded text-[10px] text-white">#${i+1}</div>
+                      </div>
+                    `).join('');
+                    break;
+                  case 'audio_text_start':
+                    el.transcriptContent.textContent = '';
+                    switchRightTab('transcript'); 
+                    break;
+                  case 'audio_text_chunk':
+                    if (el.transcriptContent.textContent === '等待音频转写...') el.transcriptContent.textContent = '';
+                    el.transcriptContent.textContent += data.content;
+                    el.transcriptContent.scrollTop = el.transcriptContent.scrollHeight;
+                    break;
+                  case 'violation_data': 
+                    renderViolations(data.content);
+                    break;
+                  case 'token':
+                    reportText += data.content;
+                    state.reportRawText = reportText;
+                    updateReport(reportText);
+                    el.progressFill.style.width = '80%';
+                    break;
+                  case 'error':
+                    addLog(data.content, 'error');
+                    break;
+                }
+              } catch (e) { console.error("JSON Parse Error", e); }
+            }
+          }
+        }
+        
+        updateStatus('complete');
+        stopTimer();
+        el.progressFill.style.width = '100%';
+        addLog('AI 审核流程全部结束', 'success');
+        setTimeout(() => el.progressContainer.classList.add('hidden'), 1000);
+
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          addLog(e.message, 'error');
+          updateStatus('error');
+          stopTimer();
+        }
+      }
+    }
+
+    function renderViolations(violationObj) {
+      const anchors = violationObj.time_anchors;
+      if (!anchors || anchors.length === 0) {
+        el.violationsContainer.innerHTML = '<div class="text-center py-20 text-slate-400"><p class="text-sm">内容合规，无违规切片</p></div>';
+        return;
+      }
+      
+      addLog(`🚩 文本红线触发！检测到 ${anchors.length} 处潜在违规，正在渲染切片...`, 'warning');
+      
+      el.violationsContainer.innerHTML = anchors.map((anchor, i) => {
+        const clipUrl = anchor.clip_url ? `${anchor.clip_url}` : null;
+        
+        return `
+          <div class="bg-white rounded-xl border border-rose-100 shadow-sm overflow-hidden mb-4">
+            <div class="bg-rose-50 px-3 py-2 border-b border-rose-100 flex justify-between items-center">
+              <span class="text-xs font-bold text-rose-700">
+                <i class="fas fa-cut mr-1"></i>证据切片 #${i+1}
+              </span>
+              <span class="text-[10px] font-mono text-rose-500 bg-white px-2 py-0.5 rounded-full border border-rose-200">
+                T: ${anchor.start}s - ${anchor.end}s
+              </span>
+            </div>
+            <div class="p-3">
+                <div class="flex items-start gap-2 mb-3">
+                    <span class="mt-0.5 text-rose-500"><i class="fas fa-comment-slash"></i></span>
+                    <p class="text-xs text-slate-700 font-medium leading-relaxed">${anchor.reason}</p>
+                </div>
+                ${clipUrl ? `
+                  <div class="bg-slate-900 aspect-video rounded-lg overflow-hidden shadow-inner flex items-center justify-center">
+                    <video src="${clipUrl}" controls class="max-h-full w-full"></video>
+                  </div>
+                ` : `<div class="h-24 bg-slate-50 flex items-center justify-center rounded-lg border border-dashed border-slate-200">
+                      <p class="text-[10px] text-slate-400">证据提取中或文件不可用</p>
+                    </div>`}
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      const tabBtn = document.querySelector('.tab-right-violations');
+      tabBtn.classList.add('animate-pulse');
+      switchRightTab('violations');
+    }
+
+    function stopTimer() {
+      if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+        el.timerDisplay.classList.replace('text-blue-500', 'text-emerald-500');
+        el.timerDisplay.classList.replace('bg-blue-50', 'bg-emerald-50');
+      }
+    }
+
+    function updateReport(text) {
+      const processedText = text.replace(
+        /^([ \t]*[-*]?[ \t]*(?:\*\*)?判定结果(?:\*\*)?[：:]\s*)(.*)$/gm, 
+        (match, prefix, content) => {
+          let newContent = content
+            .replace(/(合规)/g, '<span class="text-emerald-600 bg-emerald-50 px-1 rounded font-bold">$1</span>')
+            .replace(/(违规(?:（.*?）)?)/g, '<span class="text-rose-600 bg-rose-50 px-1 rounded font-bold">$1</span>')
+            .replace(/(需人工复审)/g, '<span class="text-amber-600 bg-amber-50 px-1 rounded font-bold">$1</span>');
+          return prefix + newContent;
+        }
+      );
+      el.reportContent.innerHTML = `<div class="markdown-body text-sm">${marked.parse(processedText)}</div>`;
+      requestAnimationFrame(() => { el.reportContent.scrollTop = el.reportContent.scrollHeight; });
+    }
+
+    function updateStatus(s) {
+      const map = { idle: { text: '待机 (Idle)', class: 'status-idle' }, processing: { text: '分析中 (Processing)', class: 'status-processing' }, complete: { text: '完成 (Complete)', class: 'status-complete' }, error: { text: '错误 (Error)', class: 'status-error' } };
+      el.statusIndicator.className = `status-indicator ${map[s].class}`;
+      el.statusText.textContent = map[s].text;
+    }
+  </script>
+</body>
+</html>

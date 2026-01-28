@@ -170,8 +170,31 @@ class VisualScanTool(BaseTool):
                 final_dets = ImageUtils.merge_overlapping_boxes(violation_bboxes, target_img.shape)
                 target_img = ImageUtils.draw_detections(target_img, final_dets, color=(0, 0, 255), thickness=3)
 
-            final_b64 = ImageUtils.encode_to_base64(target_img)
-            results_summary["preview_images"].append(final_b64)
+            # 保存临时文件并上传到 MinIO
+            temp_filename = f"frame_{frame_item['index']}_{uuid.uuid4().hex}.jpg"
+            temp_filepath = os.path.join(Config.FIXED_TEMP_DIR, temp_filename)
+            
+            try:
+                # 保存图片到临时文件
+                cv2.imwrite(temp_filepath, target_img)
+                
+                # 上传到 MinIO 并获取 URL
+                minio_url = MinioEngine.upload_file(temp_filepath)
+                results_summary["preview_images"].append('/' + minio_url.split('/', 3)[-1])
+                
+                print(f"✅ 帧 {frame_item['index']} 已上传到 MinIO: {minio_url}")
+            except Exception as e:
+                print(f"⚠️ 帧 {frame_item['index']} 上传到 MinIO 失败: {e}")
+                # 上传失败时回退到 base64
+                final_b64 = ImageUtils.encode_to_base64(target_img)
+                results_summary["preview_images"].append(final_b64)
+            finally:
+                # 清理临时文件
+                if os.path.exists(temp_filepath):
+                    try:
+                        os.remove(temp_filepath)
+                    except Exception as e:
+                        print(f"⚠️ 清理临时文件失败: {e}")
             
 
         return {

@@ -20,6 +20,16 @@ class Config:
     MINIO_BUCKET = "facerun-content-detect"
     MINIO_SECURE = False
 
+    # --- MongoDB 配置 ---
+    MONGO_URI = os.getenv("MONGO_URI", "mongodb://admin:MongoDB%40qihoo.360@merger522.add.zzzc.qihoo.net:27017/")
+    MONGO_DATABASE = os.getenv("MONGO_DATABASE", "judge_agent")
+    MONGO_MAX_POOL_SIZE = int(os.getenv("MONGO_MAX_POOL_SIZE", "100"))
+    MONGO_MIN_POOL_SIZE = int(os.getenv("MONGO_MIN_POOL_SIZE", "10"))
+    MONGO_MAX_IDLE_TIME_MS = int(os.getenv("MONGO_MAX_IDLE_TIME_MS", "10000"))
+    MONGO_SERVER_SELECTION_TIMEOUT_MS = int(os.getenv("MONGO_SERVER_SELECTION_TIMEOUT_MS", "5000"))
+    MONGO_CONNECT_TIMEOUT_MS = int(os.getenv("MONGO_CONNECT_TIMEOUT_MS", "5000"))
+    MONGO_INDEX_TTL_SECONDS = int(os.getenv("MONGO_INDEX_TTL_SECONDS", "86400"))
+
     # --- Face API 配置 ---
     FACE_API_URL = "http://hpcinf01.aitc.bjwdt.qihoo.net:6980/api/v1/image/sync"
 

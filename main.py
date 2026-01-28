@@ -50,16 +50,22 @@ async def health_check():
 @app.post("/analyze")
 async def analyze_media(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...), 
-    enable_search: bool = Form(True)
+    file: UploadFile = File(...),
+    enable_search: bool = Form(True),
+    enable_cache: bool = Form(True)
 ):
     """
     智能体审核主接口 (SSE 流式响应)
+    :param enable_cache: 是否启用 SSE 事件缓存到 MongoDB（默认 True）
     """
-    # 1. 文件预处理：保存到临时目录并识别类型
+    # 1. 文件预处理：保存到临时目录并识别类型，同时上传到 MinIO
     try:
-        file_path = FileUtils.save_upload_file(file)
+        file_path, minio_url = FileUtils.save_upload_file(file)
         file_type = FileUtils.detect_file_type(file.filename)
+        
+        # 记录 MinIO URL（可用于后续访问或存储）
+        if minio_url:
+            print(f"📦 文件已存储到 MinIO: {minio_url}")
     except Exception as e:
         # 如果文件保存就失败了，直接返回错误流
         async def error_handler():
@@ -87,7 +93,9 @@ async def analyze_media(
             # 启动 Agent 的思考与执行循环
             async for event in agent.execute(
                 file_path=file_path,
-                file_type=file_type
+                file_type=file_type,
+                s3_url=minio_url,  # 缓存结果
+                enable_cache=enable_cache  # sse响应缓存
             ):
                 yield event
         except Exception as e:

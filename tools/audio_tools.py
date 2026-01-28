@@ -10,6 +10,7 @@ from judge_agent.config import Config
 from judge_agent.tools.base import BaseTool
 from judge_agent.engines.whisper_engine import WhisperEngine
 from judge_agent.engines.llm_client import LLMClient
+from judge_agent.engines.minio_engine import MinioEngine
 from judge_agent.prompts.templates import PromptTemplates
 from judge_agent.utils.json_utils import JSONUtils
 
@@ -89,8 +90,18 @@ class AudioTranscribeTool(BaseTool):
                 
                 for i, fname in enumerate(clip_filenames):
                     if fname:
-                        # 构造前端可访问的 URL
-                        merged_anchors[i]["clip_url"] = f"/static_temp/{fname}"
+                        # 构造完整的文件路径
+                        clip_path = os.path.join(Config.FIXED_TEMP_DIR, fname)
+                        
+                        try:
+                            # 上传到 MinIO 并获取 URL
+                            minio_url = MinioEngine.upload_file(clip_path)
+                            merged_anchors[i]["clip_url"] = '/' + minio_url.split('/', 3)[-1]
+                            print(f"✅ 视频切片已上传到 MinIO: {minio_url}")
+                        except Exception as e:
+                            print(f"⚠️ 视频切片上传到 MinIO 失败: {e}")
+                            # 上传失败时回退到本地路径
+                            merged_anchors[i]["clip_url"] = f"/static_temp/{fname}"
                 
                 violation_report["segments"] = merged_anchors
         
