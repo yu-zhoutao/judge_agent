@@ -390,7 +390,7 @@
         formData.append('enable_search', true); // Default to true as the checkbox is removed
 
         addLog('正在上传并启动流式分析引擎...', 'info');
-        const res = await fetch('http://127.0.0.1:8001/analyze', {
+        const res = await fetch('/analyze', {
           method: 'POST', body: formData, signal: state.abortController.signal
         });
 
