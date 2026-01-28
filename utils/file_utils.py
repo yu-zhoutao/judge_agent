@@ -210,9 +210,12 @@ class FileUtils:
             "gl": "cn"
         }
 
+        # Setting: 设置20秒超时
+        timeout = aiohttp.ClientTimeout(total=20)
+
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get("https://serpapi.com/search.json", params=params) as response:
+                async with session.get("https://serpapi.com/search.json", params=params, timeout=timeout) as response:
                     if response.status != 200:
                         return f"搜索请求失败，状态码: {response.status}"
                     data = await response.json()
@@ -240,6 +243,9 @@ class FileUtils:
                     results_text.append(entry)
 
             return "\n".join(results_text) if results_text else "未搜索到相关结果。"
+
+        except asyncio.TimeoutError:
+            return "搜索超时（超过20秒），已停止请求。"
 
         except Exception as e:
             return f"搜索服务错误: {str(e)}"
