@@ -121,6 +121,7 @@ class MinioEngine:
         try:
             client.stat_object(bucket_name, object_name)
             # print(f"✨ 文件已存在，跳过上传: {object_name}")
+            url = url.replace("minio.di.qihoo.net:9000", "nrsh.di.360.cn")
             cls._url_cache[file_path] = url
             return url
         except:
@@ -136,6 +137,6 @@ class MinioEngine:
             file_path=file_path,
             content_type=content_type
         )
-
+        url = url.replace("minio.di.qihoo.net:9000", "nrsh.di.360.cn")
         cls._url_cache[file_path] = url
         return url

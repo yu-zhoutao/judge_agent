@@ -126,6 +126,14 @@ class VisualScanTool(BaseTool):
                             results_summary["person_names"].add(p_info)
                             results_summary["visual_risks"].append(f"发现黑名单人物: {p_info} (置信度: {p.get('similarity', 0)})")
                             frame_violated = True
+
+                            p_bbox = p.get("bbox", [])
+                            if p_bbox:
+                                violation_bboxes.append({
+                                    "bbox": p_bbox,
+                                    "label": p_name,
+                                    "score": p.get("similarity", 0)
+                                })
                 except Exception as e:
                     print(f"⚠️ 人脸识别请求异常: {e}")
             
@@ -181,7 +189,8 @@ class VisualScanTool(BaseTool):
                 # 上传到 MinIO 并获取 URL
                 minio_url = MinioEngine.upload_file(temp_filepath)
                 results_summary["preview_images"].append('/' + minio_url.split('/', 3)[-1])
-                
+                # results_summary["preview_images"].append(minio_url)   # 本地测试显示图片
+
                 print(f"✅ 帧 {frame_item['index']} 已上传到 MinIO: {minio_url}")
             except Exception as e:
                 print(f"⚠️ 帧 {frame_item['index']} 上传到 MinIO 失败: {e}")

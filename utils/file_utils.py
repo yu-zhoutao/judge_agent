@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 import time
@@ -131,28 +132,114 @@ class FileUtils:
         return f"/static_temp/{filename}"
 
     @staticmethod
+    def get_static_url(file_path: str) -> str:
+        """
+        将本地路径转换为前端可访问的静态 URL 路径
+        例如: /static_temp/violation_123.mp4
+        """
+        filename = os.path.basename(file_path)
+        return f"/static_temp/{filename}"
+
+    SERPAPI_KEYS = [
+        "0d5828c3dfb8186152b680c7c15993d68e1a24c747a6841495984273545dfbd6",
+        "536761acd747c76912bb8b216e806739246c34ebba438f0021d066c92bb7870d",
+        "8179ed1a6545437e842fb7992fecffa9d4c8f26a1ca69bcf7bbea62194824fe1"
+    ]
+
+    @staticmethod
+    async def check_serpapi_quota(session: aiohttp.ClientSession, api_key: str):
+        """辅助函数：检查单个 API Key 的余额"""
+        url = "https://serpapi.com/account"
+        params = {"api_key": api_key}
+        try:
+            # 这里的 timeout 设短一点，以免检查 Key 耗时过长影响主流程
+            async with session.get(url, params=params, timeout=5) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return api_key, data
+                return api_key, None
+        except Exception:
+            return api_key, None
+
+    @staticmethod
+    async def get_best_api_key() -> str:
+        """辅助函数：并发检查所有 Key，返回剩余次数最多的一个"""
+        candidates = [key for key in FileUtils.SERPAPI_KEYS if key]
+
+        if not candidates:
+            return ""
+
+        async with aiohttp.ClientSession() as session:
+            tasks = [FileUtils.check_serpapi_quota(session, key) for key in candidates]
+            results = await asyncio.gather(*tasks)
+
+        valid_keys = []
+        for api_key, data in results:
+            if not data: continue
+
+            left = data.get("total_searches_left", 0)
+            email = data.get("account_email", "unknown")
+
+            # 核心条件：剩余次数 > 10
+            if left > 10:
+                valid_keys.append((api_key, left, email))
+
+        if not valid_keys:
+            return ""
+
+        # 选剩余次数最多的
+        best_api_key, max_left, _ = max(valid_keys, key=lambda x: x[1])
+        print(f"选定 API Key (剩余 {max_left} 次): {best_api_key[:6]}...")
+        return best_api_key
+
+    @staticmethod
     async def async_serper_search(image_url: str, extra_query: str = "") -> str:
-        if not image_url or not Config.SERPAPI_KEY: return "未启用搜索。"
+        if not image_url: return "未启用搜索。"
+
+        api_key = await FileUtils.get_best_api_key()
+
+        if not api_key:
+            return "所有搜索 API Key 配额已耗尽，请稍后再试。"
+
+        # 1. 修改参数适配 Google Lens
         params = {
-            "engine": "google_reverse_image", "image_url": image_url,
-            "api_key": Config.SERPAPI_KEY, "hl": "zh-CN", "gl": "cn"
+            "engine": "google_lens",
+            "url": image_url,
+            "api_key": api_key,
+            "hl": "zh-CN",
+            "gl": "cn"
         }
-        if extra_query: params["q"] = extra_query
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get("https://serpapi.com/search.json", params=params) as response:
+                    if response.status != 200:
+                        return f"搜索请求失败，状态码: {response.status}"
                     data = await response.json()
-            
+
             results_text = []
+
+            # 2. 优先提取知识图谱（如果识别出了具体物体/人物）
             if "knowledge_graph" in data:
-                results_text.append(f"【知识卡片】: {data['knowledge_graph'].get('title', '')}")
-            
-            results = data.get("image_results", []) + data.get("inline_images", [])
-            for item in results[:6]:
-                title = item.get("title", "")
+                kg = data['knowledge_graph']
+                kg_title = kg.get('title', '')
+                if kg_title:
+                    results_text.append(f"【识别结果】: {kg_title}")
+
+            # 3. 提取 visual_matches 中的 title 和 link
+            matches = data.get("visual_matches", [])
+
+            for item in matches[:6]: # 限制返回前 6 个
+                title = item.get("title", "").strip()
+                link = item.get("link", "")
                 source = item.get("source", "")
-                if title: results_text.append(f"- [{source}] {title}")
-                
+
+                if title and link:
+                    # 格式：[来源] 标题 + 换行链接
+                    entry = f"- [{source}] {title}\n  {link}" if source else f"- {title}\n  {link}"
+                    results_text.append(entry)
+
             return "\n".join(results_text) if results_text else "未搜索到相关结果。"
+
         except Exception as e:
             return f"搜索服务错误: {str(e)}"
