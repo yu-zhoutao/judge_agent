@@ -12,7 +12,7 @@ import logging
 from judge_agent.utils.sse_utils import SSEUtils, CacheSSEUtils
 from judge_agent.utils.sse_cache import MongoSSECache
 from judge_agent.engines.langchain_model import build_chat_model
-from judge_agent.agent import build_agent, build_initial_state, build_middlewares
+from judge_agent.agent import build_agent, build_initial_state
 from judge_agent.agent.prompts import SYSTEM_PROMPT_LC
 
 from judge_agent.tools.langchain_tools import (
@@ -97,12 +97,10 @@ async def analyze_media(
 
     # 3. 初始化 LangGraph 智能体
     model = build_chat_model()
-    middlewares = build_middlewares(logger=logger)
     langgraph_agent = build_agent(
         model=model,
         tools=tools,
         system_prompt=SYSTEM_PROMPT_LC,
-        middlewares=middlewares,
     )
 
     # 4. 定义流式生成器
