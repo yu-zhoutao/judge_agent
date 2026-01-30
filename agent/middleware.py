@@ -4,17 +4,39 @@ from typing import Any, Dict, Optional
 class AgentMiddleware:
     name = "agent_middleware"
 
+    def before_agent(self, state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return state
+
+    def after_agent(self, result: Any, config: Optional[Dict[str, Any]] = None) -> Any:
+        return result
+
     def before_model(self, state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return state
 
     def after_model(self, result: Any, config: Optional[Dict[str, Any]] = None) -> Any:
         return result
 
+    def before_tool(self, *args, **kwargs) -> Any:
+        if args:
+            return args[0]
+        return kwargs.get("tool_input") or kwargs.get("input") or kwargs.get("tool_call")
+
+    def after_tool(self, *args, **kwargs) -> Any:
+        if args:
+            return args[0]
+        return kwargs.get("output") or kwargs.get("result")
+
     def wrap_tool_call(self, tool_call: Any, tool: Any, config: Optional[Dict[str, Any]] = None) -> Any:
         return tool_call
 
     async def awrap_tool_call(self, tool_call: Any, tool: Any, config: Optional[Dict[str, Any]] = None) -> Any:
         return self.wrap_tool_call(tool_call, tool, config)
+
+    def before_tool_call(self, tool_call: Any, tool: Any, config: Optional[Dict[str, Any]] = None) -> Any:
+        return tool_call
+
+    def after_tool_call(self, result: Any, tool: Any, config: Optional[Dict[str, Any]] = None) -> Any:
+        return result
 
 
 class SSEMiddleware(AgentMiddleware):
