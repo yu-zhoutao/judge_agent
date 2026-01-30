@@ -11,6 +11,9 @@ class AgentMiddleware:
     def wrap_tool_call(self, tool_call: Any, tool: Any, config: Optional[Dict[str, Any]] = None) -> Any:
         return tool_call
 
+    async def awrap_tool_call(self, tool_call: Any, tool: Any, config: Optional[Dict[str, Any]] = None) -> Any:
+        return self.wrap_tool_call(tool_call, tool, config)
+
 
 class SSEMiddleware(AgentMiddleware):
     def __init__(self, stream_writer):
