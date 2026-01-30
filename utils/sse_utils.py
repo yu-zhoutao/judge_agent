@@ -186,7 +186,6 @@ class SSEUtils:
             return payloads
 
         if kind == "on_tool_end":
-            payloads.append({"type": "log", "content": f"完成执行：{display_name}"})
             if include_tool_payloads and isinstance(data, dict):
                 payloads.extend(SSEUtils._tool_output_to_payloads(data.get("output")))
             return payloads
