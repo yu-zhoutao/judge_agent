@@ -7,7 +7,6 @@ import numpy as np
 from typing import Dict, List, Any, Optional
 
 from judge_agent.config import Config  # 假设你有 Config，如果没有，后面会自动降级到 static_temp
-from judge_agent.tools.base import BaseTool
 from judge_agent.utils.file_utils import FileUtils
 from judge_agent.engines.minio_engine import MinioEngine
 
@@ -17,7 +16,7 @@ except ImportError:
     ImageUtils = None
 
 
-class WebSearchTool(BaseTool):
+class WebSearchTool:
     name = "web_search"
     description = "网络搜索工具。仅支持以图搜图（单图或视频抽帧）。"
 
@@ -174,13 +173,3 @@ class WebSearchTool(BaseTool):
             "status": "success",
             "search_findings": search_findings_agg
         }
-
-    def _get_args_schema(self) -> Dict:
-        return {
-            "query": {"type": "string", "description": "辅助搜索关键词"},
-            "image_path": {"type": "string", "description": "本地图片路径"},
-            "image_url": {"type": "string", "description": "图片URL"}
-        }
-
-    def _get_required_args(self) -> List[str]:
-        return ["image_path"]

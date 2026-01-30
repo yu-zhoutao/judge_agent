@@ -1,0 +1,48 @@
+from typing import Any, Dict, Optional
+
+
+class AgentMiddleware:
+    def before_model(self, state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return state
+
+    def after_model(self, result: Any, config: Optional[Dict[str, Any]] = None) -> Any:
+        return result
+
+
+class SSEMiddleware(AgentMiddleware):
+    def __init__(self, stream_writer):
+        self.stream_writer = stream_writer
+
+    def before_model(self, state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        if self.stream_writer:
+            self.stream_writer({"type": "log", "content": "model_call_start"})
+        return state
+
+    def after_model(self, result: Any, config: Optional[Dict[str, Any]] = None) -> Any:
+        if self.stream_writer:
+            self.stream_writer({"type": "log", "content": "model_call_end"})
+        return result
+
+
+class TraceMiddleware(AgentMiddleware):
+    def __init__(self, logger):
+        self.logger = logger
+
+    def before_model(self, state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        if self.logger:
+            self.logger.info("agent_before_model", extra={"keys": list(state.keys())})
+        return state
+
+    def after_model(self, result: Any, config: Optional[Dict[str, Any]] = None) -> Any:
+        if self.logger:
+            self.logger.info("agent_after_model")
+        return result
+
+
+def build_middlewares(stream_writer=None, logger=None):
+    middlewares = []
+    if stream_writer:
+        middlewares.append(SSEMiddleware(stream_writer))
+    if logger:
+        middlewares.append(TraceMiddleware(logger))
+    return middlewares

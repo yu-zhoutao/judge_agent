@@ -1,9 +1,5 @@
 import os
-import sys
-
-
 import time
-import asyncio
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,13 +8,21 @@ from fastapi.staticfiles import StaticFiles
 # --- 修改引用路径为 judge_agent ---
 from judge_agent.config import Config
 from judge_agent.utils.file_utils import FileUtils
-from judge_agent.utils.sse_utils import SSEUtils
+from judge_agent.utils.sse_utils import SSEUtils, CacheSSEUtils
+from judge_agent.utils.sse_cache import MongoSSECache
+from judge_agent.engines.langchain_model import build_chat_model
+from judge_agent.agent import build_agent, build_initial_state, build_middlewares
+from judge_agent.agent.prompts import SYSTEM_PROMPT_LC
 
-# --- 引入新的 Agent 和 Tools ---
-from judge_agent.agent.core import AuditAgent
-from judge_agent.tools.visual_tools import VisualScanTool
-from judge_agent.tools.audio_tools import AudioTranscribeTool
-from judge_agent.tools.search_tools import WebSearchTool
+from judge_agent.tools.langchain_tools import (
+    visual_prepare_frames,
+    visual_face_check,
+    visual_behavior_check,
+    visual_ocr_check,
+    visual_render_marks,
+    audio_transcribe,
+    web_search,
+)
 
 # 初始化 FastAPI 应用
 app = FastAPI(
@@ -26,6 +30,7 @@ app = FastAPI(
     description="基于 ReAct 架构的多模态内容安全审核智能体",
     version="3.0.0" # Agent 版本
 )
+
 
 # --- 中间件配置 ---
 app.add_middleware(
@@ -76,31 +81,52 @@ async def analyze_media(
         return StreamingResponse(error_handler(), media_type="text/event-stream")
 
     # 2. 组装 Agent 的工具箱 (Toolkit)
-    # 在这里，我们将具体的“能力”实例化
     tools = [
-        VisualScanTool(),       # 视觉能力 (YOLO/Face/OCR)
-        AudioTranscribeTool(),  # 听觉能力 (Whisper)
+        visual_prepare_frames,
+        visual_face_check,
+        visual_behavior_check,
+        visual_ocr_check,
+        visual_render_marks,
+        audio_transcribe,
     ]
-    
-    # 根据用户选项决定是否给予 Agent 联网搜索能力
     if enable_search:
-        tools.append(WebSearchTool())
+        tools.append(web_search)
 
-
-    # 3. 初始化智能体
-    agent = AuditAgent(tools=tools)
+    # 3. 初始化 LangGraph 智能体
+    model = build_chat_model()
+    middlewares = build_middlewares()
+    langgraph_agent = build_agent(
+        model=model,
+        tools=tools,
+        system_prompt=SYSTEM_PROMPT_LC,
+        middlewares=middlewares,
+    )
 
     # 4. 定义流式生成器
     async def stream_factory():
+        if enable_cache:
+            memory = MongoSSECache(file_path, file_type, minio_url)
+            sse = CacheSSEUtils(memory)
+        else:
+            sse = SSEUtils
+
         try:
-            # 启动 Agent 的思考与执行循环
-            async for event in agent.execute(
+            initial_messages = [
+                {"role": "user", "content": f"请开始审核该文件。文件路径: {file_path}, 类型: {file_type}"}
+            ]
+            state = build_initial_state(
                 file_path=file_path,
                 file_type=file_type,
-                s3_url=minio_url,  # 缓存结果
-                enable_cache=enable_cache  # sse响应缓存
-            ):
-                yield event
+                s3_url=minio_url,
+                messages=initial_messages,
+                remaining_steps=10,
+            )
+
+            yield sse.log("🤖 LangGraph 智能体启动，正在流式推理...")
+
+            async for event in langgraph_agent.astream_events(state, version="v2"):
+                for sse_event in sse.format_langgraph_event(event):
+                    yield sse_event
         except Exception as e:
             import traceback
             traceback.print_exc()

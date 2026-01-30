@@ -7,14 +7,13 @@ import time
 import imageio_ffmpeg as ffmpeg
 from typing import Dict, List, Any
 from judge_agent.config import Config
-from judge_agent.tools.base import BaseTool
 from judge_agent.engines.whisper_engine import WhisperEngine
-from judge_agent.engines.llm_client import LLMClient
+from judge_agent.engines.langchain_llm import async_chat_response, async_get_json_response
 from judge_agent.engines.minio_engine import MinioEngine
 from judge_agent.prompts.templates import PromptTemplates
 from judge_agent.utils.json_utils import JSONUtils
 
-class AudioTranscribeTool(BaseTool):
+class AudioTranscribeTool:
     name = "audio_transcribe"
     description = "音频转写与违规检测工具。提取语音转文字，并自动检测政治敏感/低俗/暴恐言论。若发现违规，会自动对视频进行切片存证。"
 
@@ -45,18 +44,12 @@ class AudioTranscribeTool(BaseTool):
         correction_prompt = PromptTemplates.audio_correction_prompt(raw_text)
         corrected_text = raw_text # 默认回退
         try:
-            # 调用非流式接口获取纠错结果
-            client = LLMClient.get_async_client()
             llm_start_time = time.perf_counter()
-            resp = await client.chat.completions.create(
-                model=Config.MODEL_NAME,
-                messages=[{"role": "user", "content": correction_prompt}],
-                temperature=0.3
-            )
+            candidate = await async_chat_response(correction_prompt, temperature=0.3)
+            if candidate:
+                corrected_text = candidate
             llm_elapsed_time = time.perf_counter() - llm_start_time
             print(f"⏱️ LLM 文本纠错耗时: {llm_elapsed_time:.2f} 秒")
-            if resp.choices[0].message.content:
-                corrected_text = resp.choices[0].message.content
         except Exception as e:
             print(f"文本纠错失败，使用原文: {e}")
 
@@ -68,7 +61,7 @@ class AudioTranscribeTool(BaseTool):
 
         try:
             llm_judge_start_time = time.perf_counter()
-            violation_data = await LLMClient.get_json_response([
+            violation_data = await async_get_json_response([
                 {"role": "user", "content": judge_prompt}
             ])
             llm_judge_elapsed_time = time.perf_counter() - llm_judge_start_time
@@ -187,9 +180,3 @@ class AudioTranscribeTool(BaseTool):
         except Exception as e:
             print(f"❌ 切片异常: {e}")
             return ""
-
-    def _get_args_schema(self) -> Dict:
-        return {"file_path": {"type": "string", "description": "媒体文件路径"}}
-
-    def _get_required_args(self) -> List[str]:
-        return ["file_path"]

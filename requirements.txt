@@ -7,6 +7,9 @@ python-multipart>=0.0.6
 torch>=2.0.0
 ultralytics>=8.0.0
 openai>=1.0.0
+langchain>=1.0.0
+langgraph>=1.0.0
+langchain-openai>=0.1.0
 
 # Computer Vision
 opencv-python>=4.8.0
