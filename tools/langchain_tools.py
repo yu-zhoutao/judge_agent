@@ -336,9 +336,9 @@ async def visual_render_marks(
                 "marked_image_uploaded:\n%s",
                 json.dumps({"minio_url": minio_url}, ensure_ascii=False, indent=2),
             )
-            preview_images.append('/' + minio_url.split('/', 3)[-1])
+            # preview_images.append('/' + minio_url.split('/', 3)[-1])
+            preview_images.append(minio_url)
         except Exception as exc:
-            print(f"marked frame upload failed: {exc}")
             final_b64 = ImageUtils.encode_to_base64(target_img)
             if final_b64:
                 preview_images.append(final_b64)

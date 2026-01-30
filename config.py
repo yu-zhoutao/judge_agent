@@ -38,14 +38,14 @@ class Config:
     YOLO_MODEL_PATH = "./yolov8n.pt"
 
     # --- ASR (语音转写) API 配置 ---
-    ASR_API_URL = os.getenv("ASR_API_URL")
-    ASR_API_KEY = os.getenv("ASR_API_KEY")
+    ASR_API_URL = os.getenv("ASR_API_URL", "https://wx.di.360.cn//api/open/times/asr")
+    ASR_API_KEY = os.getenv("ASR_API_KEY", "sk-ddd27824-b92a-11f0-bf2b-0242ac12001a")
     # ASR 并发线程数
     ASR_THREAD_POOL_SIZE = 6
 
     # --- OCR API 配置 ---
-    OCR_API_URL = os.getenv("OCR_API_URL") or os.getenv("OCR_URL")
-    OCR_API_KEY = os.getenv("OCR_API_KEY")
+    OCR_API_URL = os.getenv("OCR_API_URL", "https://wx.di.360.cn/api/open/v2/models/pl_image_ocr/versions/1/infer_base64")
+    OCR_API_KEY = os.getenv("OCR_API_KEY", "sk-ddd27824-b92a-11f0-bf2b-0242ac12001a")
 
     # --- 业务目录配置 ---
     # 使用 Path 对象自动处理不同操作系统的路径分隔符
