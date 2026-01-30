@@ -218,9 +218,15 @@ async def audio_slice_evidence_tool(
     """根据违规时间轴切片并上传。"""
     if not os.path.exists(file_path):
         return {"error": f"文件不存在: {file_path}"}
-    if not time_anchors and isinstance(state, dict):
+    if isinstance(state, dict):
         report = state.get("audio_violation_report") or {}
-        time_anchors = report.get("segments") or []
+        state_anchors = report.get("segments") or []
+        if state_anchors:
+            time_anchors = state_anchors
+        elif not time_anchors:
+            time_anchors = []
+    elif not time_anchors:
+        time_anchors = []
 
     output = await slice_evidence(file_path, time_anchors or [])
     update = {"audio_violation_report": output.get("violation_check")}

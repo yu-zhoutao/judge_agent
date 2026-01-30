@@ -136,15 +136,18 @@ class SSEUtils:
         if "violation_check" in output:
             v_data = output.get("violation_check", {})
             if isinstance(v_data, dict) and v_data.get("is_violation"):
-                payloads.append(
-                    {
-                        "type": "violation_data",
-                        "content": {
-                            "is_violation": True,
-                            "time_anchors": v_data.get("segments", []),
-                        },
-                    }
-                )
+                segments = v_data.get("segments") or []
+                has_clip = any(isinstance(s, dict) and s.get("clip_url") for s in segments)
+                if has_clip:
+                    payloads.append(
+                        {
+                            "type": "violation_data",
+                            "content": {
+                                "is_violation": True,
+                                "time_anchors": segments,
+                            },
+                        }
+                    )
 
         return payloads
 
