@@ -6,16 +6,49 @@ import asyncio
 import json
 import logging
 import imageio_ffmpeg as ffmpeg
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Annotated
+
+try:
+    from langchain.tools import tool, InjectedState, InjectedToolCallId
+except Exception:
+    from langchain_core.tools import tool  # type: ignore
+    try:
+        from langchain_core.tools import InjectedToolCallId  # type: ignore
+    except Exception:  # pragma: no cover
+        from langchain.tools import InjectedToolCallId  # type: ignore
+    try:
+        from langgraph.prebuilt import InjectedState  # type: ignore
+    except Exception:  # pragma: no cover
+        from langchain.tools import InjectedState  # type: ignore
+
+from langchain_core.messages import ToolMessage
+from langgraph.types import Command
 
 from judge_agent.config import Config
 from judge_agent.engines.whisper_engine import WhisperEngine
-from judge_agent.engines.langchain_llm import async_chat_response, async_get_json_response
+from judge_agent.engines.llm_model import async_chat_response, async_get_json_response
 from judge_agent.engines.minio_engine import MinioEngine
 from judge_agent.prompts.templates import PromptTemplates
 from judge_agent.utils.json_utils import JSONUtils
+from judge_agent.utils.file_utils import FileUtils
 
 logger = logging.getLogger("judge_agent.audio_tools")
+
+
+def _serialize_tool_output(output: Dict[str, Any]) -> str:
+    return json.dumps(output, ensure_ascii=False)
+
+
+def command_with_update(
+    tool_call_id: str,
+    output: Dict[str, Any],
+    update: Dict[str, Any],
+) -> Command:
+    update_payload = dict(update)
+    update_payload["messages"] = [
+        ToolMessage(content=_serialize_tool_output(output), tool_call_id=tool_call_id)
+    ]
+    return Command(update=update_payload)
 
 
 async def asr_transcribe(file_path: str) -> Dict[str, Any]:
@@ -72,7 +105,11 @@ async def violation_check(segments: List[Dict[str, Any]]) -> Dict[str, Any]:
         ])
         if violation_data and violation_data.get("is_violation"):
             report["is_violation"] = True
-            merged_anchors = JSONUtils.merge_intervals(violation_data.get("time_anchors", []))
+            raw_anchors = violation_data.get("time_anchors", []) or []
+            for anchor in raw_anchors:
+                if not anchor.get("reason"):
+                    anchor["reason"] = "疑似违规发言"
+            merged_anchors = JSONUtils.merge_intervals(raw_anchors)
             report["segments"] = merged_anchors
     except Exception as e:
         logger.error("audio_violation_check_failed:\n%s", str(e))
@@ -96,6 +133,8 @@ async def slice_evidence(file_path: str, time_anchors: List[Dict[str, Any]]) -> 
 
     for anchor, fname in zip(time_anchors, clip_filenames):
         item = dict(anchor)
+        if not item.get("reason"):
+            item["reason"] = "疑似违规发言"
         if fname:
             clip_path = os.path.join(Config.FIXED_TEMP_DIR, fname)
             try:
@@ -113,6 +152,84 @@ async def slice_evidence(file_path: str, time_anchors: List[Dict[str, Any]]) -> 
     payload = {"status": "success", "violation_check": {"is_violation": True, "segments": merged_anchors}}
     logger.info("audio_clip_report:\n%s", json.dumps(payload, ensure_ascii=False, indent=2))
     return payload
+
+
+@tool("audio_asr_transcribe")
+async def audio_asr_transcribe(
+    file_path: str,
+    state: Annotated[Dict[str, Any], InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+) -> Dict[str, Any]:
+    """音频转写（ASR）。"""
+    file_type = state.get("file_type") if isinstance(state, dict) else None
+    if not file_type:
+        file_type = FileUtils.detect_file_type(file_path)
+
+    if file_type not in {"audio", "video"}:
+        payload = {
+            "status": "skipped",
+            "reason": "not_audio_or_video",
+            "file_type": file_type,
+            "file_path": file_path,
+        }
+        logger.info("audio_asr_skip:\n%s", json.dumps(payload, ensure_ascii=False, indent=2))
+        return payload
+
+    output = await asr_transcribe(file_path)
+    update = {
+        "audio_raw_text": output.get("raw_text", ""),
+        "audio_segments": output.get("segments", []),
+    }
+    return command_with_update(tool_call_id, output, update)
+
+
+@tool("audio_correct_text")
+async def audio_correct_text_tool(
+    state: Annotated[Dict[str, Any], InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    raw_text: str = "",
+) -> Dict[str, Any]:
+    """音频文本纠错。"""
+    if not raw_text and isinstance(state, dict):
+        raw_text = state.get("audio_raw_text") or ""
+
+    output = await correct_text(raw_text)
+    update = {"audio_corrected_text": output.get("corrected_text", "")}
+    return command_with_update(tool_call_id, output, update)
+
+
+@tool("audio_violation_check")
+async def audio_violation_check_tool(
+    state: Annotated[Dict[str, Any], InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    segments: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """音频违规检测（不切片）。"""
+    if not segments and isinstance(state, dict):
+        segments = state.get("audio_segments") or []
+
+    output = await violation_check(segments or [])
+    update = {"audio_violation_report": output.get("violation_check")}
+    return command_with_update(tool_call_id, output, update)
+
+
+@tool("audio_slice_evidence")
+async def audio_slice_evidence_tool(
+    file_path: str,
+    state: Annotated[Dict[str, Any], InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    time_anchors: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """根据违规时间轴切片并上传。"""
+    if not os.path.exists(file_path):
+        return {"error": f"文件不存在: {file_path}"}
+    if not time_anchors and isinstance(state, dict):
+        report = state.get("audio_violation_report") or {}
+        time_anchors = report.get("segments") or []
+
+    output = await slice_evidence(file_path, time_anchors or [])
+    update = {"audio_violation_report": output.get("violation_check")}
+    return command_with_update(tool_call_id, output, update)
 
 
 async def _slice_media(input_path: str, start: float, end: float) -> str:

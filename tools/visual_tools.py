@@ -25,12 +25,29 @@ from judge_agent.engines.face_engine import FaceEngine
 from judge_agent.engines.minio_engine import MinioEngine
 from judge_agent.engines.ocr_engine import OcrEngine
 from judge_agent.engines.yolo_engine import YoloEngine
-from judge_agent.engines.langchain_llm import async_get_json_response, build_visual_messages
+from judge_agent.engines.llm_model import async_get_json_response, build_visual_messages
 from judge_agent.prompts.templates import PromptTemplates
 from judge_agent.utils.image_utils import ImageUtils
-from judge_agent.tools.tool_utils import command_with_update
+from langchain_core.messages import ToolMessage
+from langgraph.types import Command
 
 logger = logging.getLogger("judge_agent.tools")
+
+
+def _serialize_tool_output(output: Dict[str, Any]) -> str:
+    return json.dumps(output, ensure_ascii=False)
+
+
+def command_with_update(
+    tool_call_id: str,
+    output: Dict[str, Any],
+    update: Dict[str, Any],
+) -> Command:
+    update_payload = dict(update)
+    update_payload["messages"] = [
+        ToolMessage(content=_serialize_tool_output(output), tool_call_id=tool_call_id)
+    ]
+    return Command(update=update_payload)
 
 _FRAME_CACHE: Dict[str, List[Dict[str, Any]]] = {}
 _FRAME_LOCKS: Dict[str, asyncio.Lock] = {}

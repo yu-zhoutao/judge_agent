@@ -18,30 +18,32 @@ from judge_agent.config import Config
 from judge_agent.utils.file_utils import FileUtils
 from judge_agent.utils.sse_utils import SSEUtils, CacheSSEUtils
 from judge_agent.utils.sse_cache import MongoSSECache
-from judge_agent.engines.langchain_model import build_chat_model
+from judge_agent.engines.llm_model import build_chat_model
 from judge_agent.agent import build_agent, build_initial_state
 from judge_agent.agent.prompts import SYSTEM_PROMPT_LC
 
-from judge_agent.tools.langchain_tools import (
+from judge_agent.tools.visual_tools import (
     visual_prepare_frames,
     visual_face_check,
     visual_behavior_check,
     visual_ocr_check,
     visual_render_marks,
+)
+from judge_agent.tools.audio_tools import (
     audio_asr_transcribe,
     audio_correct_text_tool,
     audio_violation_check_tool,
     audio_slice_evidence_tool,
-    web_search,
 )
+from judge_agent.tools.search_tools import web_search
 
 logger = logging.getLogger("judge_agent")
 
 # 初始化 FastAPI 应用
 app = FastAPI(
-    title="JianceAI Audit Agent",
-    description="基于 ReAct 架构的多模态内容安全审核智能体",
-    version="3.0.0" # Agent 版本
+    title="Judge Agent",
+    description="多模态内容安全审核智能体",
+    version="2.0" # Agent 版本
 )
 
 

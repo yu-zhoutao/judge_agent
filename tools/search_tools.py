@@ -6,6 +6,11 @@ import cv2  # 需要导入 opencv 来保存图片
 import numpy as np
 from typing import Dict, List, Any, Optional
 
+try:
+    from langchain.tools import tool
+except Exception:
+    from langchain_core.tools import tool  # type: ignore
+
 from judge_agent.config import Config  # 假设你有 Config，如果没有，后面会自动降级到 static_temp
 from judge_agent.utils.file_utils import FileUtils
 from judge_agent.engines.minio_engine import MinioEngine
@@ -177,3 +182,12 @@ class WebSearchTool:
             "status": "success",
             "search_findings": search_findings_agg
         }
+
+
+_search_tool = WebSearchTool()
+
+
+@tool("web_search")
+async def web_search(query: str = "", image_path: str = "", image_url: str = "") -> Dict[str, Any]:
+    """网络以图搜图。"""
+    return await _search_tool.run(query=query, image_path=image_path, image_url=image_url)

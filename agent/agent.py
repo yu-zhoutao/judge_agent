@@ -1,7 +1,7 @@
 import inspect
 from typing import Any, Dict, Iterable, Optional
 
-from judge_agent.agent.langchain_state import GraphAgentState
+from judge_agent.agent.state import GraphAgentState
 from judge_agent.agent.prompts import SYSTEM_PROMPT_LC
 
 
