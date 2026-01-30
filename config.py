@@ -9,8 +9,8 @@ load_dotenv()
 class Config:
     # --- API 配置 ---
     SERPAPI_KEY = os.getenv("SERPAPI_KEY")
-    VLLM_API_URL = os.getenv("API_URL", "http://127.0.0.1:8008/v1") 
-    VLLM_API_KEY = os.getenv("API_KEY", "EMPTY") 
+    API_URL = os.getenv("API_URL", "http://127.0.0.1:8008/v1") 
+    API_KEY = os.getenv("API_KEY", "EMPTY") 
     MODEL_NAME = os.getenv("MODEL_NAME", "Qwen3-VL-30B-A3B-Instruct")
     
     # --- MinIO 配置 ---

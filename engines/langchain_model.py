@@ -16,16 +16,16 @@ def build_chat_model(streaming: bool = True, temperature: float = 0.1) -> Any:
     kwargs = {"model": Config.MODEL_NAME}
 
     if "openai_api_key" in params:
-        kwargs["openai_api_key"] = Config.VLLM_API_KEY
+        kwargs["openai_api_key"] = Config.API_KEY
     elif "api_key" in params:
-        kwargs["api_key"] = Config.VLLM_API_KEY
+        kwargs["api_key"] = Config.API_KEY
 
     if "openai_api_base" in params:
-        kwargs["openai_api_base"] = Config.VLLM_API_URL
+        kwargs["openai_api_base"] = Config.API_URL
     elif "base_url" in params:
-        kwargs["base_url"] = Config.VLLM_API_URL
+        kwargs["base_url"] = Config.API_URL
     elif "api_base" in params:
-        kwargs["api_base"] = Config.VLLM_API_URL
+        kwargs["api_base"] = Config.API_URL
 
     if "streaming" in params:
         kwargs["streaming"] = streaming
