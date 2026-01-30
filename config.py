@@ -9,8 +9,14 @@ load_dotenv()
 class Config:
     # --- API 配置 ---
     SERPAPI_KEY = os.getenv("SERPAPI_KEY")
-    API_URL = os.getenv("API_URL", "http://127.0.0.1:8008/v1") 
-    API_KEY = os.getenv("API_KEY", "EMPTY") 
+    _RAW_API_URL = (
+        os.getenv("API_URL")
+        or os.getenv("OPENAI_BASE_URL")
+        or os.getenv("OPENAI_API_BASE")
+        or "http://127.0.0.1:8008/v1"
+    )
+    API_URL = _RAW_API_URL.rstrip("/") + "/v1" if not _RAW_API_URL.rstrip("/").endswith("/v1") else _RAW_API_URL
+    API_KEY = os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY") or "EMPTY"
     MODEL_NAME = os.getenv("MODEL_NAME", "Qwen3-VL-30B-A3B-Instruct")
     
     # --- MinIO 配置 ---
