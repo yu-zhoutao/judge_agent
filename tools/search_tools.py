@@ -25,46 +25,50 @@ class WebSearchTool:
         """
         内部并发单元：负责单帧图片的 MinIO 上传 + SerpApi 搜索
         """
-        # --- 再次防御：确保进来的 img_path 必须是字符串路径 ---
-        if not isinstance(img_path, str):
-            return {"idx": index, "error": f"处理逻辑错误：期望文件路径(str)，实际得到 {type(img_path)}"}
 
-        target_url = current_url
+        return {"idx": index, "error": "搜索次数有限，暂停搜索功能"}
 
-        # 1. 检查并上传图片
-        if not target_url:
-            if not img_path:
-                return {"idx": index, "error": "图片路径为空"}
 
-            if not os.path.exists(img_path):
-                return {"idx": index, "error": f"文件不存在: {img_path}"}
+        # # --- 再次防御：确保进来的 img_path 必须是字符串路径 ---
+        # if not isinstance(img_path, str):
+        #     return {"idx": index, "error": f"处理逻辑错误：期望文件路径(str)，实际得到 {type(img_path)}"}
 
-            try:
-                # 放入线程池执行上传
-                target_url = await asyncio.to_thread(MinioEngine.upload_file, img_path)
-            except Exception as e:
-                print(f"❌ [Task-{index}] MinIO 上传失败: {e}")
-                return {"idx": index, "error": f"上传失败: {e}"}
+        # target_url = current_url
 
-        if not target_url:
-            return {"idx": index, "error": "无法获取有效的图片 URL"}
+        # # 1. 检查并上传图片
+        # if not target_url:
+        #     if not img_path:
+        #         return {"idx": index, "error": "图片路径为空"}
 
-        # 2. 调用以图搜图
-        search_start = time.perf_counter()
-        try:
-            print(f"🔍 [Task-{index}] 开始搜索：{target_url}")
-            search_result = await FileUtils.async_serper_search(target_url, extra_query=query)
-            cost = time.perf_counter() - search_start
-            print(f"⏱️ [Task-{index}] 搜索耗时: {cost:.2f}s")
-            print(f"🔍 搜索结果：\n{search_result}")
-            return {
-                "idx": index,
-                "status": "success",
-                "finding": search_result
-            }
-        except Exception as e:
-            print(f"❌ [Task-{index}] 搜索异常: {e}")
-            return {"idx": index, "error": str(e)}
+        #     if not os.path.exists(img_path):
+        #         return {"idx": index, "error": f"文件不存在: {img_path}"}
+
+        #     try:
+        #         # 放入线程池执行上传
+        #         target_url = await asyncio.to_thread(MinioEngine.upload_file, img_path)
+        #     except Exception as e:
+        #         print(f"❌ [Task-{index}] MinIO 上传失败: {e}")
+        #         return {"idx": index, "error": f"上传失败: {e}"}
+
+        # if not target_url:
+        #     return {"idx": index, "error": "无法获取有效的图片 URL"}
+
+        # # 2. 调用以图搜图
+        # search_start = time.perf_counter()
+        # try:
+        #     print(f"🔍 [Task-{index}] 开始搜索：{target_url}")
+        #     search_result = await FileUtils.async_serper_search(target_url, extra_query=query)
+        #     cost = time.perf_counter() - search_start
+        #     print(f"⏱️ [Task-{index}] 搜索耗时: {cost:.2f}s")
+        #     print(f"🔍 搜索结果：\n{search_result}")
+        #     return {
+        #         "idx": index,
+        #         "status": "success",
+        #         "finding": search_result
+        #     }
+        # except Exception as e:
+        #     print(f"❌ [Task-{index}] 搜索异常: {e}")
+        #     return {"idx": index, "error": str(e)}
 
     def _save_numpy_to_temp_file(self, img_data: np.ndarray) -> str:
         """

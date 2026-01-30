@@ -32,7 +32,7 @@ class Config:
     MONGO_INDEX_TTL_SECONDS = int(os.getenv("MONGO_INDEX_TTL_SECONDS", "86400"))
 
     # --- Face API 配置 ---
-    FACE_API_URL = "http://hpcinf01.aitc.bjwdt.qihoo.net:16980/api/v1/image/sync"
+    FACE_API_URL = "http://hpcinf01.aitc.bjwdt.qihoo.net:6980/api/v1/image/sync"
 
     # --- 模型路径配置 ---
     YOLO_MODEL_PATH = "./yolov8n.pt"
