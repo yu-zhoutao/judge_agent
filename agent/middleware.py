@@ -35,7 +35,10 @@ class TraceMiddleware(AgentMiddleware):
 
     def after_model(self, result: Any, config: Optional[Dict[str, Any]] = None) -> Any:
         if self.logger:
-            self.logger.info("agent_after_model")
+            content = getattr(result, "content", None)
+            if content is None and isinstance(result, dict):
+                content = result.get("content")
+            self.logger.info("agent_after_model", extra={"content": content})
         return result
 
 

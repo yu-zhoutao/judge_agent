@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import asyncio
+import logging
 from typing import Any, Dict, List, Optional, Annotated, Tuple
 
 import cv2
@@ -32,6 +33,7 @@ from judge_agent.tools.audio_tools import AudioTranscribeTool
 from judge_agent.tools.search_tools import WebSearchTool
 from judge_agent.utils.image_utils import ImageUtils
 
+logger = logging.getLogger("judge_agent.tools")
 
 _FRAME_CACHE: Dict[str, List[Dict[str, Any]]] = {}
 _FRAME_LOCKS: Dict[str, asyncio.Lock] = {}
@@ -329,6 +331,7 @@ async def visual_render_marks(
         try:
             cv2.imwrite(temp_filepath, target_img)
             minio_url = MinioEngine.upload_file(temp_filepath)
+            logger.info("marked_image_uploaded", extra={"minio_url": minio_url})
             preview_images.append('/' + minio_url.split('/', 3)[-1])
         except Exception as exc:
             print(f"marked frame upload failed: {exc}")
@@ -414,6 +417,7 @@ async def visual_face_check(
         "detected_persons": list(detected_persons),
         "face_findings": findings,
     }
+    logger.info("face_findings", extra={"data": output})
 
     update = {
         "visual_face_findings": findings,
@@ -485,6 +489,7 @@ async def visual_behavior_check(
         "visual_risks": list(set(visual_risks)),
         "visual_findings": findings,
     }
+    logger.info("behavior_findings", extra={"data": output})
 
     update = {
         "visual_behavior_findings": findings,
@@ -546,6 +551,7 @@ async def visual_ocr_check(
         "ocr_risks": list(set(ocr_risks)),
         "ocr_findings": findings,
     }
+    logger.info("ocr_findings", extra={"data": output})
 
     update = {
         "visual_ocr_findings": findings,

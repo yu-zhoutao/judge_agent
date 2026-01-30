@@ -1,7 +1,12 @@
-import requests
 import json
+import logging
 from typing import List, Dict, Any
+
+import requests
+
 from judge_agent.config import Config
+
+logger = logging.getLogger("judge_agent.face_engine")
 
 class FaceEngine:
     """API based Face Recognition Engine (Optimized for specific Face API)"""
@@ -33,9 +38,12 @@ class FaceEngine:
         found_results = []
         
         try:
-            print(f"🚀 调用人脸识别 API: {image_url}")
+            logger.info("face_api_request", extra={"image_url": image_url})
             response = requests.post(url, headers=headers, json=payload, timeout=30)
-            print(f"🚀 人脸识别结果: \n{response.json()}")
+            try:
+                logger.info("face_api_response", extra={"response": response.json()})
+            except Exception:
+                logger.info("face_api_response_text", extra={"response": response.text})
             if response.status_code == 200:
                 res_json = response.json()
                 
@@ -63,11 +71,11 @@ class FaceEngine:
                                     "bbox": bbox
                                 })
                 else:
-                    print(f"⚠️ Face API 返回错误状态码: {res_json.get('code')} - {res_json.get('msg')}")
+                    logger.warning("face_api_error", extra={"code": res_json.get("code"), "msg": res_json.get("msg")})
             else:
-                print(f"❌ Face API 请求失败: {response.status_code}")
+                logger.error("face_api_request_failed", extra={"status_code": response.status_code})
 
         except Exception as e:
-            print(f"❌ Face API 请求异常: {e}")
+            logger.exception("face_api_exception")
             
         return found_results

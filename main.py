@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 # --- 修改引用路径为 judge_agent ---
 from judge_agent.config import Config
 from judge_agent.utils.file_utils import FileUtils
+import logging
 from judge_agent.utils.sse_utils import SSEUtils, CacheSSEUtils
 from judge_agent.utils.sse_cache import MongoSSECache
 from judge_agent.engines.langchain_model import build_chat_model
@@ -25,6 +26,8 @@ from judge_agent.tools.langchain_tools import (
 )
 
 # 初始化 FastAPI 应用
+logger = logging.getLogger("judge_agent")
+
 app = FastAPI(
     title="JianceAI Audit Agent",
     description="基于 ReAct 架构的多模态内容安全审核智能体",
@@ -94,7 +97,7 @@ async def analyze_media(
 
     # 3. 初始化 LangGraph 智能体
     model = build_chat_model()
-    middlewares = build_middlewares()
+    middlewares = build_middlewares(logger=logger)
     langgraph_agent = build_agent(
         model=model,
         tools=tools,

@@ -4,9 +4,13 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage
 
+import logging
+
 from judge_agent.config import Config
 from judge_agent.engines.langchain_model import build_chat_model
 from judge_agent.utils.json_utils import JSONUtils
+
+logger = logging.getLogger("judge_agent.langchain_llm")
 
 
 def _to_messages(messages: Sequence[Dict[str, Any]]) -> List[BaseMessage]:
@@ -59,7 +63,9 @@ async def async_chat_response(
 
     model = _get_model_cached(False, temperature, None)
     response = await model.ainvoke(_to_messages(msg_list))
-    return response.content or ""
+    content = response.content or ""
+    logger.info("llm_text_response", extra={"content": content})
+    return content
 
 
 async def async_get_json_response(
@@ -76,6 +82,7 @@ async def async_get_json_response(
     model = _get_model_cached(False, temperature, response_format)
     response = await model.ainvoke(_to_messages(msg_list))
     content = response.content or ""
+    logger.info("llm_json_raw_response", extra={"content": content})
 
     if not content:
         return None

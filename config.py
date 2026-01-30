@@ -44,7 +44,7 @@ class Config:
     ASR_THREAD_POOL_SIZE = 6
 
     # --- OCR API 配置 ---
-    OCR_API_URL = os.getenv("OCR_API_URL")
+    OCR_API_URL = os.getenv("OCR_API_URL") or os.getenv("OCR_URL")
     OCR_API_KEY = os.getenv("OCR_API_KEY")
 
     # --- 业务目录配置 ---

@@ -123,6 +123,16 @@ class SSEUtils:
         kind = event.get("event")
         name = event.get("name") or "unknown"
         data = event.get("data") or {}
+        tool_name_map = {
+            "visual_prepare_frames": "关键帧准备",
+            "visual_face_check": "人脸识别",
+            "visual_behavior_check": "违规行为识别",
+            "visual_ocr_check": "OCR 文本识别",
+            "visual_render_marks": "标记图片生成",
+            "audio_transcribe": "音频转写与违规检测",
+            "web_search": "联网检索",
+        }
+        display_name = tool_name_map.get(name, name)
 
         if kind in ("on_chat_model_stream", "on_llm_stream"):
             chunk = data.get("chunk") if isinstance(data, dict) else None
@@ -132,27 +142,27 @@ class SSEUtils:
             return payloads
 
         if kind == "on_chat_model_start":
-            payloads.append({"type": "log", "content": f"chat_model_start:{name}"})
+            payloads.append({"type": "log", "content": "模型正在生成响应..."})
             return payloads
 
         if kind == "on_chat_model_end":
-            payloads.append({"type": "log", "content": f"chat_model_end:{name}"})
+            payloads.append({"type": "log", "content": "模型响应完成"})
             return payloads
 
         if kind == "on_chain_start":
-            payloads.append({"type": "log", "content": f"chain_start:{name}"})
+            payloads.append({"type": "log", "content": "审核流程开始"})
             return payloads
 
         if kind == "on_chain_end":
-            payloads.append({"type": "log", "content": f"chain_end:{name}"})
+            payloads.append({"type": "log", "content": "审核流程结束"})
             return payloads
 
         if kind == "on_tool_start":
-            payloads.append({"type": "log", "content": f"tool_start:{name}"})
+            payloads.append({"type": "log", "content": f"开始执行：{display_name}"})
             return payloads
 
         if kind == "on_tool_end":
-            payloads.append({"type": "log", "content": f"tool_end:{name}"})
+            payloads.append({"type": "log", "content": f"完成执行：{display_name}"})
             if include_tool_payloads and isinstance(data, dict):
                 payloads.extend(SSEUtils._tool_output_to_payloads(data.get("output")))
             return payloads

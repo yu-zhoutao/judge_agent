@@ -1,14 +1,16 @@
-import base64
-import json
 import ast
-import requests
-import numpy as np
-import cv2
+import base64
+import logging
 from typing import List, Dict, Any, Union
 
+import cv2
+import numpy as np
+import requests
 import urllib3
 
 from judge_agent.config import Config
+
+logger = logging.getLogger("judge_agent.ocr_engine")
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 class OcrEngine:
@@ -56,6 +58,9 @@ class OcrEngine:
 
             # 2. 构造请求参数
             url = Config.OCR_API_URL
+            if not url:
+                logger.error("ocr_api_url_missing")
+                return []
             payload = {
                 "IMAGE": encoded_image,
                 "base64_list": ["IMAGE"]
@@ -92,15 +97,16 @@ class OcrEngine:
                                 "box": box
                             })
                 else:
-                    print(f"⚠️ OCR API 响应格式异常: {outer_response}")
+                    logger.warning("ocr_api_invalid_response", extra={"response": outer_response})
             else:
-                print(f"❌ OCR API 请求失败: {response.status_code} - {response.text}")
+                logger.error("ocr_api_request_failed", extra={"status_code": response.status_code, "response": response.text})
 
         except Exception as e:
-            print(f"❌ OCR 识别过程中发生错误: {e}")
+            logger.exception("ocr_api_exception")
             # 根据需要决定是否 raise 异常，或者返回空列表
             # raise e
 
+        logger.info("ocr_results", extra={"results": ocr_results})
         return ocr_results
 
     @classmethod
