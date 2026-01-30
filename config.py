@@ -9,15 +9,10 @@ load_dotenv()
 class Config:
     # --- API 配置 ---
     SERPAPI_KEY = os.getenv("SERPAPI_KEY")
-    _RAW_API_URL = (
-        os.getenv("API_URL")
-        or os.getenv("OPENAI_BASE_URL")
-        or os.getenv("OPENAI_API_BASE")
-        or "http://127.0.0.1:8008/v1"
-    )
-    API_URL = _RAW_API_URL.rstrip("/") + "/v1" if not _RAW_API_URL.rstrip("/").endswith("/v1") else _RAW_API_URL
-    API_KEY = os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY") or "EMPTY"
-    MODEL_NAME = os.getenv("MODEL_NAME", "Qwen3-VL-30B-A3B-Instruct")
+
+    API_URL = os.getenv("API_URL","http://ai.qihoo.net/v1")
+    API_KEY = os.getenv("API_KEY","PT-fJ3nlZ2hUrdWXKzwqEMuQkiTDpCIGjgBtPRy04Y8")
+    MODEL_NAME = os.getenv("MODEL_NAME","Qwen3-VL-30B-A3B-Instruct")
     
     # --- MinIO 配置 ---
     MINIO_ENDPOINT = "minio.di.qihoo.net:9000"
@@ -37,7 +32,7 @@ class Config:
     MONGO_INDEX_TTL_SECONDS = int(os.getenv("MONGO_INDEX_TTL_SECONDS", "86400"))
 
     # --- Face API 配置 ---
-    FACE_API_URL = "http://hpcinf01.aitc.bjwdt.qihoo.net:6980/api/v1/image/sync"
+    FACE_API_URL = "http://hpcinf01.aitc.bjwdt.qihoo.net:16980/api/v1/image/sync"
 
     # --- 模型路径配置 ---
     YOLO_MODEL_PATH = "./yolov8n.pt"
