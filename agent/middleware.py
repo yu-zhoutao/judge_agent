@@ -8,6 +8,9 @@ class AgentMiddleware:
     def after_model(self, result: Any, config: Optional[Dict[str, Any]] = None) -> Any:
         return result
 
+    def wrap_tool_call(self, tool_call: Any, tool: Any, config: Optional[Dict[str, Any]] = None) -> Any:
+        return tool_call
+
 
 class SSEMiddleware(AgentMiddleware):
     def __init__(self, stream_writer):
