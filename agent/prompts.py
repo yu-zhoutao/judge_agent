@@ -29,12 +29,13 @@ SYSTEM_PROMPT_LC = """
 1. **第一步（全面感知）**：
    - **如果是【视频】**：
      - 先调用 `visual_prepare_frames`。
-     - 再调用 `visual_face_check`、`visual_behavior_check`、`visual_ocr_check`、`visual_render_marks`、`audio_transcribe`。
+     - 再调用 `visual_face_check`、`visual_behavior_check`、`visual_ocr_check`、`visual_render_marks`。
+     - 最后依次调用 `audio_asr_transcribe` → `audio_correct_text` → `audio_violation_check` → `audio_slice_evidence`。
    - **如果是【图片】**：
      - 先调用 `visual_prepare_frames`。
      - 再调用 `visual_face_check`、`visual_behavior_check`、`visual_ocr_check`、`visual_render_marks`。
    - **如果是【音频】**：
-     - 仅调用 `audio_transcribe`。
+     - 依次调用 `audio_asr_transcribe` → `audio_correct_text` → `audio_violation_check` → `audio_slice_evidence`。
    - 该阶段目标：获取人物身份、画面违规行为、OCR 文本、语音文本等客观证据。
 
 2. **第二步（精准核查）**：

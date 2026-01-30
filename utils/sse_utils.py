@@ -129,7 +129,10 @@ class SSEUtils:
             "visual_behavior_check": "违规行为识别",
             "visual_ocr_check": "OCR 文本识别",
             "visual_render_marks": "标记图片生成",
-            "audio_transcribe": "音频转写与违规检测",
+            "audio_asr_transcribe": "音频转写",
+            "audio_correct_text": "音频文本纠错",
+            "audio_violation_check": "音频违规检测",
+            "audio_slice_evidence": "音频证据切片",
             "web_search": "联网检索",
         }
         display_name = tool_name_map.get(name, name)

@@ -34,3 +34,7 @@ class GraphAgentState(TypedDict):
     visual_ocr_findings: Annotated[List[Dict[str, Any]], _replace_value]
     visual_marked_images: Annotated[List[str], _replace_value]
     visual_marked_images_file_path: Annotated[Optional[str], _replace_value]
+    audio_raw_text: Annotated[Optional[str], _replace_value]
+    audio_segments: Annotated[List[Dict[str, Any]], _replace_value]
+    audio_corrected_text: Annotated[Optional[str], _replace_value]
+    audio_violation_report: Annotated[Optional[Dict[str, Any]], _replace_value]

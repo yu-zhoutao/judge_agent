@@ -28,7 +28,10 @@ from judge_agent.tools.langchain_tools import (
     visual_behavior_check,
     visual_ocr_check,
     visual_render_marks,
-    audio_transcribe,
+    audio_asr_transcribe,
+    audio_correct_text_tool,
+    audio_violation_check_tool,
+    audio_slice_evidence_tool,
     web_search,
 )
 
@@ -97,7 +100,10 @@ async def analyze_media(
         visual_behavior_check,
         visual_ocr_check,
         visual_render_marks,
-        audio_transcribe,
+        audio_asr_transcribe,
+        audio_correct_text_tool,
+        audio_violation_check_tool,
+        audio_slice_evidence_tool,
     ]
     if enable_search:
         tools.append(web_search)

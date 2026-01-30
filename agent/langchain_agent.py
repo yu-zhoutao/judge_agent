@@ -90,4 +90,8 @@ def build_initial_state(
         "visual_ocr_findings": [],
         "visual_marked_images": [],
         "visual_marked_images_file_path": None,
+        "audio_raw_text": None,
+        "audio_segments": [],
+        "audio_corrected_text": None,
+        "audio_violation_report": None,
     }
