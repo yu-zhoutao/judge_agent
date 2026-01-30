@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
@@ -5,10 +6,16 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s:%(name)s:%(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,
+)
+
 # --- 修改引用路径为 judge_agent ---
 from judge_agent.config import Config
 from judge_agent.utils.file_utils import FileUtils
-import logging
 from judge_agent.utils.sse_utils import SSEUtils, CacheSSEUtils
 from judge_agent.utils.sse_cache import MongoSSECache
 from judge_agent.engines.langchain_model import build_chat_model
@@ -25,9 +32,9 @@ from judge_agent.tools.langchain_tools import (
     web_search,
 )
 
-# 初始化 FastAPI 应用
 logger = logging.getLogger("judge_agent")
 
+# 初始化 FastAPI 应用
 app = FastAPI(
     title="JianceAI Audit Agent",
     description="基于 ReAct 架构的多模态内容安全审核智能体",

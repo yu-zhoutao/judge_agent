@@ -32,6 +32,7 @@ from judge_agent.prompts.templates import PromptTemplates
 from judge_agent.tools.audio_tools import AudioTranscribeTool
 from judge_agent.tools.search_tools import WebSearchTool
 from judge_agent.utils.image_utils import ImageUtils
+from judge_agent.utils.file_utils import FileUtils
 
 logger = logging.getLogger("judge_agent.tools")
 
@@ -331,7 +332,10 @@ async def visual_render_marks(
         try:
             cv2.imwrite(temp_filepath, target_img)
             minio_url = MinioEngine.upload_file(temp_filepath)
-            logger.info("marked_image_uploaded", extra={"minio_url": minio_url})
+            logger.info(
+                "marked_image_uploaded:\n%s",
+                json.dumps({"minio_url": minio_url}, ensure_ascii=False, indent=2),
+            )
             preview_images.append('/' + minio_url.split('/', 3)[-1])
         except Exception as exc:
             print(f"marked frame upload failed: {exc}")
@@ -417,7 +421,7 @@ async def visual_face_check(
         "detected_persons": list(detected_persons),
         "face_findings": findings,
     }
-    logger.info("face_findings", extra={"data": output})
+    logger.info("face_findings:\n%s", json.dumps(output, ensure_ascii=False, indent=2))
 
     update = {
         "visual_face_findings": findings,
@@ -489,7 +493,7 @@ async def visual_behavior_check(
         "visual_risks": list(set(visual_risks)),
         "visual_findings": findings,
     }
-    logger.info("behavior_findings", extra={"data": output})
+    logger.info("behavior_findings:\n%s", json.dumps(output, ensure_ascii=False, indent=2))
 
     update = {
         "visual_behavior_findings": findings,
@@ -551,7 +555,7 @@ async def visual_ocr_check(
         "ocr_risks": list(set(ocr_risks)),
         "ocr_findings": findings,
     }
-    logger.info("ocr_findings", extra={"data": output})
+    logger.info("ocr_findings:\n%s", json.dumps(output, ensure_ascii=False, indent=2))
 
     update = {
         "visual_ocr_findings": findings,
@@ -568,8 +572,27 @@ _search_tool = WebSearchTool()
 
 
 @tool("audio_transcribe")
-async def audio_transcribe(file_path: str) -> Dict[str, Any]:
+async def audio_transcribe(
+    file_path: str,
+    state: Annotated[Dict[str, Any], InjectedState],
+) -> Dict[str, Any]:
     """音频转写与违规检测。"""
+    file_type = None
+    if isinstance(state, dict):
+        file_type = state.get("file_type")
+    if not file_type:
+        file_type = FileUtils.detect_file_type(file_path)
+
+    if file_type not in {"audio", "video"}:
+        payload = {
+            "status": "skipped",
+            "reason": "not_audio_or_video",
+            "file_type": file_type,
+            "file_path": file_path,
+        }
+        logger.info("audio_transcribe_skip:\n%s", json.dumps(payload, ensure_ascii=False, indent=2))
+        return payload
+
     return await _audio_tool.run(file_path=file_path)
 
 

@@ -4,6 +4,8 @@ import os
 import uuid
 import asyncio
 import time
+import json
+import logging
 import imageio_ffmpeg as ffmpeg
 from typing import Dict, List, Any
 from judge_agent.config import Config
@@ -12,6 +14,8 @@ from judge_agent.engines.langchain_llm import async_chat_response, async_get_jso
 from judge_agent.engines.minio_engine import MinioEngine
 from judge_agent.prompts.templates import PromptTemplates
 from judge_agent.utils.json_utils import JSONUtils
+
+logger = logging.getLogger("judge_agent.audio_tools")
 
 class AudioTranscribeTool:
     name = "audio_transcribe"
@@ -24,34 +28,37 @@ class AudioTranscribeTool:
 
         # 1. 语音转录 (Whisper)
         loop = asyncio.get_running_loop()
-        whisper_start_time = time.perf_counter()
         try:
             raw_text, segments = await loop.run_in_executor(
                 None, WhisperEngine.transcribe, file_path
             )
-            whisper_elapsed_time = time.perf_counter() - whisper_start_time
-            print(f"⏱️ Whisper 转录耗时: {whisper_elapsed_time:.2f} 秒")
         except Exception as e:
-            whisper_elapsed_time = time.perf_counter() - whisper_start_time
-            print(f"❌ Whisper 转录失败，耗时: {whisper_elapsed_time:.2f} 秒: {e}")
+            logger.error("asr_error:\n%s", str(e))
             return {"error": f"转写失败: {e}"}
 
         if not raw_text.strip():
             return {"status": "success", "text_content": "无有效语音", "violation_segments": []}
+
+        logger.info(
+            "asr_result:\n%s",
+            json.dumps({"text": raw_text, "segments": segments}, ensure_ascii=False, indent=2),
+        )
 
         # 2. 文本纠错 (生成适合阅读的字幕)
         # 这一步是为了生成前端需要的"更通顺的文本"
         correction_prompt = PromptTemplates.audio_correction_prompt(raw_text)
         corrected_text = raw_text # 默认回退
         try:
-            llm_start_time = time.perf_counter()
             candidate = await async_chat_response(correction_prompt, temperature=0.3)
             if candidate:
                 corrected_text = candidate
-            llm_elapsed_time = time.perf_counter() - llm_start_time
-            print(f"⏱️ LLM 文本纠错耗时: {llm_elapsed_time:.2f} 秒")
         except Exception as e:
-            print(f"文本纠错失败，使用原文: {e}")
+            logger.warning("audio_correction_failed:\n%s", str(e))
+
+        logger.info(
+            "asr_corrected_text:\n%s",
+            json.dumps({"corrected_text": corrected_text}, ensure_ascii=False, indent=2),
+        )
 
         # 3. 违规判定 (LLM)
         formatted_text = WhisperEngine.format_segments_for_llm(segments)
@@ -60,12 +67,9 @@ class AudioTranscribeTool:
         violation_report = {"is_violation": False, "segments": []}
 
         try:
-            llm_judge_start_time = time.perf_counter()
             violation_data = await async_get_json_response([
                 {"role": "user", "content": judge_prompt}
             ])
-            llm_judge_elapsed_time = time.perf_counter() - llm_judge_start_time
-            print(f"⏱️ LLM 违规判定耗时: {llm_judge_elapsed_time:.2f} 秒")
             
             if violation_data and violation_data.get("is_violation"):
                 violation_report["is_violation"] = True
@@ -91,16 +95,24 @@ class AudioTranscribeTool:
                             minio_url = MinioEngine.upload_file(clip_path)
                             merged_anchors[i]["clip_url"] = '/' + minio_url.split('/', 3)[-1]
                             # merged_anchors[i]["clip_url"] = minio_url      # 本地测试显示视频和音频
-                            print(f"✅ 视频切片已上传到 MinIO: {minio_url}")
+                            logger.info(
+                                "audio_clip_uploaded:\n%s",
+                                json.dumps({"clip_url": minio_url}, ensure_ascii=False, indent=2),
+                            )
                         except Exception as e:
-                            print(f"⚠️ 视频切片上传到 MinIO 失败: {e}")
+                            logger.warning("audio_clip_upload_failed:\n%s", str(e))
                             # 上传失败时回退到本地路径
                             merged_anchors[i]["clip_url"] = f"/static_temp/{fname}"
                 
                 violation_report["segments"] = merged_anchors
         
         except Exception as e:
-            print(f"音频合规性检测失败: {e}")
+            logger.error("audio_violation_check_failed:\n%s", str(e))
+
+        logger.info(
+            "audio_violation_report:\n%s",
+            json.dumps(violation_report, ensure_ascii=False, indent=2),
+        )
 
 
         # 返回包含所有前端所需信息的字典 (不再包含 corrected_text)
@@ -170,13 +182,32 @@ class AudioTranscribeTool:
             slice_elapsed_time = time.perf_counter() - slice_start_time
 
             if process.returncode == 0:
-                print(f"✅ 切片成功 ({'音频' if is_audio_mode else '视频'}), 耗时: {slice_elapsed_time:.2f} 秒")
+                logger.info(
+                    "slice_success:\n%s",
+                    json.dumps(
+                        {
+                            "type": "audio" if is_audio_mode else "video",
+                            "duration_sec": slice_elapsed_time,
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                )
                 return output_filename
             else:
-                print(f"❌ 切片失败，耗时: {slice_elapsed_time:.2f} 秒")
-                # 打印 stderr 有助于调试 ffmpeg 错误
-                print(f"FFmpeg Error: {stderr.decode()}")
+                logger.error(
+                    "slice_failed:\n%s",
+                    json.dumps(
+                        {
+                            "type": "audio" if is_audio_mode else "video",
+                            "duration_sec": slice_elapsed_time,
+                            "stderr": stderr.decode(),
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                )
                 return ""
         except Exception as e:
-            print(f"❌ 切片异常: {e}")
+            logger.error("slice_exception:\n%s", str(e))
             return ""

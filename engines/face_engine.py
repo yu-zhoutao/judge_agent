@@ -38,12 +38,14 @@ class FaceEngine:
         found_results = []
         
         try:
-            logger.info("face_api_request", extra={"image_url": image_url})
             response = requests.post(url, headers=headers, json=payload, timeout=30)
             try:
-                logger.info("face_api_response", extra={"response": response.json()})
+                logger.info(
+                    "face_api_result:\n%s",
+                    json.dumps(response.json(), ensure_ascii=False, indent=2),
+                )
             except Exception:
-                logger.info("face_api_response_text", extra={"response": response.text})
+                logger.info("face_api_result_text:\n%s", response.text)
             if response.status_code == 200:
                 res_json = response.json()
                 

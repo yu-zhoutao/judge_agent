@@ -1,5 +1,6 @@
 import ast
 import base64
+import json
 import logging
 from typing import List, Dict, Any, Union
 
@@ -106,7 +107,7 @@ class OcrEngine:
             # 根据需要决定是否 raise 异常，或者返回空列表
             # raise e
 
-        logger.info("ocr_results", extra={"results": ocr_results})
+        logger.info("ocr_results:\n%s", json.dumps(ocr_results, ensure_ascii=False, indent=2))
         return ocr_results
 
     @classmethod

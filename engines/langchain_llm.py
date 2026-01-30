@@ -13,6 +13,40 @@ from judge_agent.utils.json_utils import JSONUtils
 logger = logging.getLogger("judge_agent.langchain_llm")
 
 
+def _mask_image_url(url: str) -> str:
+    if url.startswith("data:image"):
+        return f"data:image/<base64>({len(url)} chars)"
+    return url
+
+
+def _safe_messages_for_log(messages: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    safe: List[Dict[str, Any]] = []
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content")
+        if isinstance(content, list):
+            safe_content: List[Any] = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "image_url":
+                    image_url = dict(item.get("image_url") or {})
+                    url = image_url.get("url")
+                    if isinstance(url, str):
+                        image_url["url"] = _mask_image_url(url)
+                    safe_content.append({"type": "image_url", "image_url": image_url})
+                else:
+                    safe_content.append(item)
+            content = safe_content
+        safe.append({"role": role, "content": content})
+    return safe
+
+
+def _pretty_json(data: Any) -> str:
+    try:
+        return json.dumps(data, ensure_ascii=False, indent=2)
+    except Exception:
+        return str(data)
+
+
 def _to_messages(messages: Sequence[Dict[str, Any]]) -> List[BaseMessage]:
     converted: List[BaseMessage] = []
     for msg in messages:
@@ -61,10 +95,13 @@ async def async_chat_response(
     else:
         msg_list = messages
 
+    safe_msgs = _safe_messages_for_log(msg_list)
+    logger.info("llm_request_messages:\n%s", _pretty_json(safe_msgs))
+
     model = _get_model_cached(False, temperature, None)
     response = await model.ainvoke(_to_messages(msg_list))
     content = response.content or ""
-    logger.info("llm_text_response", extra={"content": content})
+    logger.info("llm_text_response:\n%s", _pretty_json(content))
     return content
 
 
@@ -78,11 +115,14 @@ async def async_get_json_response(
     else:
         msg_list = messages
 
+    safe_msgs = _safe_messages_for_log(msg_list)
+    logger.info("llm_request_messages:\n%s", _pretty_json(safe_msgs))
+
     response_format = "json" if "json" in Config.MODEL_NAME.lower() else None
     model = _get_model_cached(False, temperature, response_format)
     response = await model.ainvoke(_to_messages(msg_list))
     content = response.content or ""
-    logger.info("llm_json_raw_response", extra={"content": content})
+    logger.info("llm_json_raw_response:\n%s", _pretty_json(content))
 
     if not content:
         return None
