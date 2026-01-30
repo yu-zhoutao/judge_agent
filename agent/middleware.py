@@ -2,6 +2,8 @@ from typing import Any, Dict, Optional
 
 
 class AgentMiddleware:
+    name = "agent_middleware"
+
     def before_model(self, state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return state
 
@@ -16,6 +18,7 @@ class AgentMiddleware:
 
 
 class SSEMiddleware(AgentMiddleware):
+    name = "sse_middleware"
     def __init__(self, stream_writer):
         self.stream_writer = stream_writer
 
@@ -31,6 +34,7 @@ class SSEMiddleware(AgentMiddleware):
 
 
 class TraceMiddleware(AgentMiddleware):
+    name = "trace_middleware"
     def __init__(self, logger):
         self.logger = logger
 
