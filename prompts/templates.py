@@ -113,7 +113,8 @@ class PromptTemplates:
 }}
 注意：
 1. 如果没有违规，is_violation 为 false，time_anchors 为空列表。
-2. 只要返回 JSON，不要任何其他解释。"""
+2. 每条 time_anchors 必须包含非空 reason 字段，原因需基于该时间段文本归纳。
+3. 只要返回 JSON，不要任何其他解释。"""
 
     @staticmethod
     def visual_match_prompt() -> str:

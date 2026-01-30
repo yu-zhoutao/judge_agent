@@ -106,9 +106,6 @@ async def violation_check(segments: List[Dict[str, Any]]) -> Dict[str, Any]:
         if violation_data and violation_data.get("is_violation"):
             report["is_violation"] = True
             raw_anchors = violation_data.get("time_anchors", []) or []
-            for anchor in raw_anchors:
-                if not anchor.get("reason"):
-                    anchor["reason"] = "疑似违规发言"
             merged_anchors = JSONUtils.merge_intervals(raw_anchors)
             report["segments"] = merged_anchors
     except Exception as e:
@@ -132,9 +129,7 @@ async def slice_evidence(file_path: str, time_anchors: List[Dict[str, Any]]) -> 
     merged_anchors = []
 
     for anchor, fname in zip(time_anchors, clip_filenames):
-        item = dict(anchor)
-        if not item.get("reason"):
-            item["reason"] = "疑似违规发言"
+        item = dict(anchor) if isinstance(anchor, dict) else {}
         if fname:
             clip_path = os.path.join(Config.FIXED_TEMP_DIR, fname)
             try:

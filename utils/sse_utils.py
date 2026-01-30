@@ -77,6 +77,40 @@ class SSEUtils:
     def _tool_output_dict_to_payloads(output: Dict[str, Any]) -> List[Dict[str, Any]]:
         payloads: List[Dict[str, Any]] = []
 
+        if "detected_persons" in output:
+            persons = output.get("detected_persons") or []
+            if persons:
+                payloads.append({"type": "log", "content": f"识别到人物：{', '.join(persons)}"})
+            else:
+                payloads.append({"type": "log", "content": "未识别到人脸人物"})
+
+        if "ocr_risks" in output:
+            risks = output.get("ocr_risks") or []
+            if risks:
+                payloads.append({"type": "log", "content": f"OCR 识别到风险文本：{', '.join(risks)}"})
+            else:
+                payloads.append({"type": "log", "content": "OCR 未识别到风险文本"})
+
+        if "visual_risks" in output:
+            risks = output.get("visual_risks") or []
+            if risks:
+                payloads.append({"type": "log", "content": "违规行为识别到可疑目标"})
+            else:
+                payloads.append({"type": "log", "content": "未识别到违规行为目标"})
+
+        if "search_findings" in output:
+            findings = output.get("search_findings") or ""
+            if findings:
+                payloads.append({"type": "log", "content": "搜索结果已返回"})
+
+        if "violation_check" in output:
+            v_data = output.get("violation_check") or {}
+            if isinstance(v_data, dict):
+                if v_data.get("is_violation"):
+                    payloads.append({"type": "log", "content": "音频违规检测：发现违规片段"})
+                else:
+                    payloads.append({"type": "log", "content": "音频违规检测：未发现违规片段"})
+
         if "preview_images" in output:
             payloads.append({"type": "images", "content": output.get("preview_images")})
 
@@ -142,22 +176,6 @@ class SSEUtils:
             token = SSEUtils._extract_text_from_chunk(chunk)
             if token:
                 payloads.append({"type": "token", "content": token})
-            return payloads
-
-        if kind == "on_chat_model_start":
-            payloads.append({"type": "log", "content": "模型正在生成响应..."})
-            return payloads
-
-        if kind == "on_chat_model_end":
-            payloads.append({"type": "log", "content": "模型响应完成"})
-            return payloads
-
-        if kind == "on_chain_start":
-            payloads.append({"type": "log", "content": "审核流程开始"})
-            return payloads
-
-        if kind == "on_chain_end":
-            payloads.append({"type": "log", "content": "审核流程结束"})
             return payloads
 
         if kind == "on_tool_start":
